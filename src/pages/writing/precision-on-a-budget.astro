@@ -65,6 +65,56 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       the cost of measuring, packing, and dispatching the selected values.
     </p>
 
+    <h2>A toy prototype: CADO</h2>
+    <p>
+      One concrete starting point is to flag activation columns whose maximum
+      magnitude across a batch exceeds a threshold. Route those columns through
+      a higher-precision matrix multiply, and quantize the remaining activation
+      and weight rows for an INT8 multiply. This captures the decomposition
+      behind Cache-Aware Dynamic Outlier Offloading (CADO): a shared low-
+      precision path plus a smaller high-precision path.
+    </p>
+
+    <pre><code>{`import numpy as np
+
+
+def cado_matrix_multiply(x, weights, threshold=6.0):
+    """Illustrate batch-level outlier routing for x @ weights."""
+    x = np.asarray(x, dtype=np.float32)
+    weights = np.asarray(weights, dtype=np.float32)
+    if x.ndim != 2 or weights.ndim != 2 or x.shape[1] != weights.shape[0]:
+        raise ValueError("Expected compatible 2D activation and weight matrices")
+    if x.shape[0] == 0 or x.shape[1] == 0 or weights.shape[1] == 0:
+        raise ValueError("Matrices must have non-empty dimensions")
+
+    outlier_mask = np.max(np.abs(x), axis=0) >= threshold
+    result = np.zeros((x.shape[0], weights.shape[1]), dtype=np.float32)
+
+    if np.any(outlier_mask):
+        result += x[:, outlier_mask] @ weights[outlier_mask, :]
+
+    normal_mask = ~outlier_mask
+    if np.any(normal_mask):
+        x_normal = x[:, normal_mask]
+        w_normal = weights[normal_mask, :]
+        scale_x = max(float(np.max(np.abs(x_normal))) / 127.0, 1e-12)
+        scale_w = max(float(np.max(np.abs(w_normal))) / 127.0, 1e-12)
+        x_int8 = np.clip(np.round(x_normal / scale_x), -127, 127).astype(np.int8)
+        w_int8 = np.clip(np.round(w_normal / scale_w), -127, 127).astype(np.int8)
+        result += (x_int8.astype(np.int32) @ w_int8.astype(np.int32)) * (scale_x * scale_w)
+
+    return result`}</code></pre>
+
+    <p>
+      This is a correctness-oriented sketch, not a cache-aware implementation
+      or a performance result. The threshold is shared across the batch, the
+      high-precision subset is selected by activation magnitude rather than
+      measured sensitivity, and the code does not constrain its working set to
+      a capacity C. It also omits kernel-launch, packing, and hardware effects.
+      Those are exactly the choices and costs an experiment would need to
+      define and measure.
+    </p>
+
     <h2>How to test it</h2>
     <p>
       Compare dynamic allocation with uniform low-precision execution and a
