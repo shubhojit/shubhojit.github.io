@@ -1,0 +1,29 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+const areas = [
+  ["Multimodal reasoning", "How models combine visual, textual, and interaction information to reason over complex environments."],
+  ["Post-training & reinforcement learning", "How SFT, preference optimization, reward modeling, and distillation shape capable foundation models."],
+  ["Agentic simulation", "How interactive environments can measure and improve planning, grounding, decision-making, and safety over long horizons."],
+  ["Efficient intelligence", "How to preserve reasoning quality while reducing training cost, latency, memory, and unnecessary inference."],
+  ["AI safety & evaluation", "How to move beyond static benchmarks toward realistic, adversarial, closed-loop evaluation of capable agents."]
+];
+---
+<BaseLayout title="Research — AI Research">
+  <section class="hero">
+    <div class="kicker">Research</div>
+    <h1>Questions I want to understand.</h1>
+    <p class="lede">
+      I am interested in the boundary between foundation-model research and
+      real systems: what models learn, how they reason, how we evaluate them,
+      and how we make them useful and reliable.
+    </p>
+  </section>
+  <div>
+    {areas.map(([title, text]) => (
+      <div class="card" style="margin-bottom: 28px;">
+        <h2 style="margin-top:0;">{title}</h2>
+        <p>{text}</p>
+      </div>
+    ))}
+  </div>
+</BaseLayout>

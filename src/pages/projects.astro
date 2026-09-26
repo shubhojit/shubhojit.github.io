@@ -1,0 +1,38 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+const projects = [
+  {
+    title: "Multimodal Reasoning Platform",
+    meta: "Microsoft · Research → production",
+    text: "A multi-year effort spanning multimodal reasoning, distributed training, evaluation, distillation, quantization, and production inference. The central engineering question was how to improve reasoning capability while preserving operational efficiency.",
+    tags: ["Multimodal", "Reasoning", "Distributed training", "Distillation"]
+  },
+  {
+    title: "Agentic Safety & Simulation",
+    meta: "Microsoft · Closed-loop evaluation",
+    text: "Built systems that move evaluation from static examples toward interactive task trajectories, combining multimodal models, reward modeling, preference optimization, and long-horizon simulation.",
+    tags: ["Agents", "Simulation", "Safety", "Post-training"]
+  },
+  {
+    title: "GUI Grounding for Search Safety",
+    meta: "Microsoft · Multimodal understanding",
+    text: "Developed models that reason over interface elements and user interaction traces for safer GUI-grounded search experiences.",
+    tags: ["VLMs", "Grounding", "Safety"]
+  }
+];
+---
+<BaseLayout title="Projects — AI Research">
+  <section class="hero">
+    <div class="kicker">Selected projects</div>
+    <h1>Systems where research meets reality.</h1>
+    <p class="lede">A few projects that shaped how I think about models, infrastructure, evaluation, and product impact.</p>
+  </section>
+  {projects.map((project) => (
+    <article class="card" style="margin-bottom: 42px;">
+      <div class="meta">{project.meta}</div>
+      <h2 style="margin-top:0;">{project.title}</h2>
+      <p>{project.text}</p>
+      <div>{project.tags.map(tag => <span class="tag">{tag}</span>)}</div>
+    </article>
+  ))}
+</BaseLayout>

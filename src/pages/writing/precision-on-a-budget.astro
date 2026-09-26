@@ -1,0 +1,138 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout
+  title="Precision on a Budget — Shubhojit"
+  description="A research hypothesis on using activation statistics to allocate limited high-precision, on-chip memory and improve inference quality–latency tradeoffs."
+>
+  <article>
+    <div class="meta">Research note · Hypothesis</div>
+    <h1>Precision on a Budget</h1>
+    <p class="lede">
+      Can activation statistics help a model decide where scarce high-precision,
+      on-chip memory is most valuable?
+    </p>
+
+    <p>
+      Quantization changes more than the number of bits used to represent a
+      weight. It changes which values move through the system, where temporary
+      data lives, and how much work fits close to the compute units. That makes
+      precision allocation a systems question as much as a numerical one.
+    </p>
+
+    <p>
+      The idea here is a hypothesis, not a result: use information about the
+      current activations to decide which parts of a computation deserve a
+      higher-precision path, while keeping the fast-memory working set within a
+      fixed budget.
+    </p>
+
+    <h2>The hypothesis</h2>
+    <p>
+      Under a fixed on-chip memory budget, activation-aware precision routing
+      can achieve a better quality–latency tradeoff than a static outlier
+      policy. In this framing, L1 cache is one possible budget; other hardware
+      may expose a different fast-memory tier or capacity.
+    </p>
+
+    <div class="constraint" role="math" aria-label="Minimize end-to-end latency subject to task quality meeting a minimum target and the fast-memory working set staying within capacity C">
+      <strong>minimize</strong> end-to-end latency<br />
+      <strong>subject to</strong> task quality ≥ Q<sub>min</sub><br />
+      fast-memory working set ≤ C
+    </div>
+
+    <p>
+      The central question is whether the activation distribution can guide
+      the allocation of scarce high-precision and on-chip memory resources
+      better than a fixed rule can.
+    </p>
+
+    <h2>What would be routed?</h2>
+    <p>
+      A layer could divide its computation into units such as channels or
+      blocks. An allocator would estimate which units are most sensitive to
+      reduced precision for the current input, then spend a limited high-
+      precision budget on those units. The rest would use a lower-precision
+      path. The exact signal and granularity are open design choices: activation
+      magnitude is easy to measure, but magnitude alone need not predict
+      quantization error or downstream task quality.
+    </p>
+
+    <p>
+      “Activation-aware” also needs a precise meaning. Routing could adapt for
+      every input, operate at batch or block granularity, or use statistics
+      gathered during calibration. These choices trade responsiveness against
+      the cost of measuring, packing, and dispatching the selected values.
+    </p>
+
+    <h2>How to test it</h2>
+    <p>
+      Compare dynamic allocation with uniform low-precision execution and a
+      clearly specified static outlier baseline. Hold the model, task data, and
+      total fast-memory budget constant. Sweep that budget and measure the
+      quality–latency frontier, rather than reporting a single point chosen
+      after the fact.
+    </p>
+
+    <p>At minimum, report:</p>
+    <ul>
+      <li>Task quality at each memory budget.</li>
+      <li>End-to-end latency, including detection, packing, dispatch, and result fusion.</li>
+      <li>Working-set size and hardware counters relevant to cache or on-chip-memory behavior.</li>
+      <li>Results across input lengths and batch sizes, not only one favorable workload.</li>
+    </ul>
+
+    <p>
+      The comparison should include the overhead of routing. A policy that
+      saves cache capacity but adds irregular gathers, extra launches, or
+      synchronization may lose on latency. Likewise, fitting a nominal working
+      set under C does not guarantee that it will avoid conflict misses or
+      achieve better bandwidth on a real processor.
+    </p>
+
+    <h2>What could make the idea fail?</h2>
+    <p>
+      The activation signal may not identify the values that matter most to
+      output quality. Routing overhead may erase the savings. Dynamic sparsity
+      may interfere with vectorized kernels, or the selected high-precision
+      subset may change too quickly to reuse data effectively. Any of these
+      outcomes would be useful: they would show where static quantization or a
+      simpler allocation rule is the better systems choice.
+    </p>
+
+    <h2>Scope and prior work</h2>
+    <p>
+      This is not a claim that mixed-precision outlier handling is new.
+      <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noreferrer">LLM.int8()</a>
+      uses a mixed-precision decomposition for outlier features, while
+      <a href="https://arxiv.org/abs/2211.10438" target="_blank" rel="noreferrer">SmoothQuant</a>
+      uses activation statistics to shift quantization difficulty between
+      activations and weights. The question here is narrower and should be
+      tested against relevant existing methods: can the allocation policy be
+      explicitly optimized for a constrained fast-memory budget, and does that
+      improve end-to-end quality and latency?
+    </p>
+
+    <p>
+      This is one possible extension of the broader token-efficiency argument.
+      Shorter sequences reduce the amount of work; precision routing asks how
+      efficiently each unit of work is represented and moved. Both matter, but
+      they are different budgets—and should be measured separately.
+    </p>
+  </article>
+</BaseLayout>
+
+<style>
+  .constraint {
+    margin: 28px 0;
+    padding: 18px 22px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--accent);
+    color: var(--text);
+    font: 500 18px/1.8 "DM Sans", sans-serif;
+  }
+
+  .constraint strong {
+    color: var(--accent);
+  }
+</style>
