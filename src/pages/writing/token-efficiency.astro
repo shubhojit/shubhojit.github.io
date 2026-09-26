@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import Equation from "../../components/Equation.astro";
 ---
 <BaseLayout
   title="Why Token Efficiency Still Matters — AI Research"
@@ -26,32 +27,115 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       cannot completely fix a sloppy data representation.
     </p>
 
-    <h2>The unforgiving math of the transformer</h2>
+    <h2>A token is not one uniform unit of cost</h2>
     <p>
-      Every time a model processes a token, it pays a computational tax. In the
-      standard scaling picture, training compute is often approximated as
-      proportional to the number of parameters multiplied by the number of
-      training tokens:
+      The word “token” hides several different bills. During training, more
+      tokens mean more examples flowing through the model. During inference,
+      prompt tokens are processed together in a prefill phase, while generated
+      tokens arrive one at a time. Both phases use attention, but their work
+      grows differently. The KV cache adds a separate memory cost that grows
+      with the context kept alive.
     </p>
 
-    <p class="equation"><strong>C</strong> ≈ 6<strong>N</strong><strong>D</strong></p>
-
+    <h2>Training: parameters meet data</h2>
     <p>
-      Here, <strong>N</strong> is the number of model parameters and
-      <strong>D</strong> is the number of training tokens. The exact constant
-      depends on the architecture and accounting convention, but the practical
-      lesson is durable: tokens are one of the quantities directly multiplied
-      into the compute bill.
+      A common first-order estimate for training a dense transformer is:
+    </p>
+    <Equation
+      expression={String.raw`C_{\mathrm{train}} \approx 6ND`}
+      label="Training compute is approximately six times the number of parameters times the number of training tokens"
+    />
+    <p>
+      Here, <strong>C<sub>train</sub></strong> is training computation in
+      floating-point operations, <strong>N</strong> is the number of model
+      parameters, and <strong>D</strong> is the number of training tokens. The
+      factor of six is a rough accounting rule for the forward and backward
+      matrix operations in a dense model. It is not a universal constant: the
+      exact count depends on architecture and what operations are included.
+      In particular, this compact estimate does not separately model the
+      sequence-length cost of attention.
+    </p>
+    <p>
+      The useful intuition is narrower than “every token always costs the
+      same.” If the model and training recipe stay fixed, processing more
+      training tokens generally increases the training work roughly in
+      proportion to D. But this equation says nothing by itself about whether
+      those extra tokens improve the model enough to justify their cost.
     </p>
 
+    <h2>Inference has two phases</h2>
+    <h3>1. Prefill: processing the prompt</h3>
     <p>
-      Inference has a different cost profile, but the same pressure remains.
-      With a growing context, each new token must attend over more previous
-      tokens. The full attention operation has quadratic sequence-length
-      scaling, while autoregressive decoding pays an increasing per-token
-      attention cost and stores keys and values for the entire context in the
-      KV cache. A bloated representation therefore compounds across prompts,
-      generated reasoning, tool traces, and retrieved documents.
+      Before the first answer token can be generated, the model processes the
+      prompt of length P. For ordinary dense self-attention, the attention
+      portion of that work scales approximately as:
+    </p>
+    <Equation
+      expression={String.raw`W_{\mathrm{prefill,attn}} = O(LP^2d)`}
+      label="Prefill attention work grows in proportion to layers times prompt length squared times hidden width"
+    />
+    <p>
+      <strong>L</strong> is the number of transformer layers, <strong>P</strong>
+      is prompt length in tokens, and <strong>d</strong> is the hidden width.
+      The square appears because attention compares tokens with other tokens in
+      the prompt. Double P and this part of the work can approach four times as
+      much. This is an asymptotic description of attention, not a latency
+      prediction for a particular GPU; projections, MLPs, kernels, and memory
+      traffic also matter.
+    </p>
+
+    <h3>2. Decode: producing the answer</h3>
+    <p>
+      Generation is sequential: the next token depends on the previous ones.
+      At decode step j, attention reads the prompt and the j−1 answer tokens
+      already produced. Across G generated tokens, the attention work is
+      approximately:
+    </p>
+    <Equation
+      expression={String.raw`W_{\mathrm{decode,attn}} = O\!\left(Ld\left[GP + \frac{G(G-1)}{2}\right]\right)`}
+      label="Decode attention work grows with layers and hidden width times generated tokens multiplied by prompt length plus the triangular sum of earlier generated tokens"
+    />
+    <p>
+      <strong>G</strong> is the number of generated tokens. The term GP counts
+      each generated token attending over the original prompt. The sum
+      G(G−1)/2 counts generated tokens attending over earlier generated
+      tokens: the first has none, the next has one, then two, and so on. This
+      equation describes attention only. Each decode step also performs
+      projections and feed-forward computation, and real latency depends on
+      batching and hardware utilization.
+    </p>
+    <p>
+      This is why prompt tokens and generated tokens should be reported
+      separately. A longer prompt affects prefill and is revisited by every
+      generated step. A longer answer adds sequential steps and makes later
+      attention steps read a longer history.
+    </p>
+
+    <h2>The memory bill: the KV cache</h2>
+    <p>
+      To avoid recomputing old keys and values at every decode step, a serving
+      system keeps them in a key-value cache. A useful estimate for its size is:
+    </p>
+    <Equation
+      expression={String.raw`M_{\mathrm{KV}} \approx 2LBTn_{\mathrm{kv}}d_hb`}
+      label="KV cache memory is approximately two times layers, batch size, context length, KV heads, head dimension, and bytes per value"
+    />
+    <p>
+      <strong>M<sub>KV</sub></strong> is cache memory in bytes. The factor two
+      accounts for keys and values. <strong>L</strong> is the number of layers,
+      <strong>B</strong> the number of sequences served together,
+      <strong>T</strong> the cached context length, <strong>n<sub>kv</sub></strong>
+      the number of key/value heads, <strong>d<sub>h</sub></strong> each head’s
+      width, and <strong>b</strong> the bytes used for each stored value.
+    </p>
+    <p>
+      For an illustrative model with 32 layers, 8 KV heads, head width 128,
+      and two-byte cache values, one sequence needs about 128 KiB per cached
+      token. At 8,192 tokens that is about 1 GiB, before accounting for model
+      weights, temporary buffers, or serving-system overhead. The estimate
+      changes with the architecture, batch size, cache precision, and whether
+      heads or cache blocks are shared. Its point is to show why context length
+      can limit how many concurrent requests fit in memory.
     </p>
 
     <h2>Why quantization will not save you</h2>
@@ -110,6 +194,26 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       tokenizers that reflect the data they encode.
     </p>
 
+    <h2>Efficiency means meeting a quality target</h2>
+    <p>
+      This gives us a more useful way to state the goal. Let π represent a
+      system choice, such as how much context to retrieve, how compactly to
+      encode it, or how long to let generation continue:
+    </p>
+    <Equation
+      expression={String.raw`\min_{\pi}\; \mathbb{E}[\mathrm{serving\ cost}(\pi)] \quad \text{subject to} \quad Q(\pi) \ge Q_{\min}`}
+      label="Choose a system policy that minimizes expected serving cost while keeping task quality above a minimum target"
+    />
+    <p>
+      In plain language: reduce the expected cost of serving a request, but
+      only among choices that still meet a minimum quality target. The policy
+      π might change context selection, representation, or generation length.
+      Q(π) is a task-appropriate quality measure, and Q<sub>min</sub> is the
+      lowest acceptable score. Cost could mean compute, latency, memory, money,
+      or a weighted combination; an experiment must say which one it measures.
+      This also makes clear why “fewer tokens” is not automatically “better.”
+    </p>
+
     <p>
       Building tight feedback loops around these choices is what separates a
       fragile prototype from an architecture that can handle millions of active
@@ -130,10 +234,16 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         Kaplan, Jared, et al. <a href="https://arxiv.org/abs/2001.08361" target="_blank" rel="noreferrer">Scaling Laws for Neural Language Models</a>. 2020.
       </li>
       <li>
-        Dao, Tri, et al. <a href="https://arxiv.org/abs/2005.00928" target="_blank" rel="noreferrer">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a>. 2022.
+        Hoffmann, Jordan, et al. <a href="https://arxiv.org/abs/2203.15556" target="_blank" rel="noreferrer">Training Compute-Optimal Large Language Models</a>. 2022.
+      </li>
+      <li>
+        Dao, Tri, et al. <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness</a>. 2022.
       </li>
       <li>
         Pope, Reiner, et al. <a href="https://arxiv.org/abs/2302.05473" target="_blank" rel="noreferrer">Efficiently Scaling Transformer Inference</a>. 2023.
+      </li>
+      <li>
+        Kwon, Woosuk, et al. <a href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noreferrer">Efficient Memory Management for Large Language Model Serving with PagedAttention</a>. 2023.
       </li>
       <li>
         Bradbury, James, et al. <a href="https://jax-ml.github.io/scaling-book/" target="_blank" rel="noreferrer">The Scaling Book</a>. JAX, 2023.
@@ -143,14 +253,6 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 </BaseLayout>
 
 <style>
-  .equation {
-    margin: 28px 0;
-    color: var(--accent);
-    font-family: "DM Sans", sans-serif;
-    font-size: 24px;
-    letter-spacing: .02em;
-  }
-
   ol {
     padding-left: 1.5rem;
     color: var(--muted);
