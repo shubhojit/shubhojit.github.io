@@ -2,28 +2,22 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 const posts = [
   {
+    title: "Animals Don’t Plan by Enumerating the Future",
+    tags: ["Essay", "Planning", "Neuroscience"],
+    description: "A look at predictive maps, successor representations, replay, and why long-horizon planning may rely on compressed futures instead of brute-force search.",
+    href: "/writing/predictive-planning"
+  },
+  {
     title: "Why Token Efficiency Still Matters",
-    date: "Draft",
+    tags: ["AI Systems", "Inference", "Efficiency"],
     description: "A working argument for why efficient reasoning remains important even as inference compute becomes abundant.",
     href: "/writing/token-efficiency"
   },
   {
     title: "Precision on a Budget",
-    date: "Research note",
+    tags: ["AI Systems", "Quantization", "Inference"],
     description: "A research hypothesis on activation-aware precision routing under a fast-memory budget.",
     href: "/writing/precision-on-a-budget"
-  },
-  {
-    title: "From Static Benchmarks to Agentic Simulation",
-    date: "Draft",
-    description: "What changes when evaluation becomes interactive, long-horizon, and grounded in realistic task trajectories.",
-    href: "/writing"
-  },
-  {
-    title: "What Production-Scale AI Teaches You About Research",
-    date: "Draft",
-    description: "Lessons from building multimodal reasoning systems where scientific progress and systems constraints meet.",
-    href: "/writing"
   }
 ];
 ---
@@ -35,7 +29,7 @@ const posts = [
   </section>
   {posts.map(post => (
     <div class="card" style="margin-bottom: 32px;">
-      <div class="meta">{post.date}</div>
+      <div class="meta">{post.tags.join(" · ")}</div>
       <h2 style="margin-top:0;"><a href={post.href}>{post.title}</a></h2>
       <p>{post.description}</p>
     </div>

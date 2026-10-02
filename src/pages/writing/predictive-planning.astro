@@ -1,0 +1,469 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Equation from "../../components/Equation.astro";
+---
+
+<BaseLayout
+  title="Animals Don’t Plan by Enumerating the Future — AI Research"
+  description="A human explanation of predictive maps, successor representations, replay, and why long-horizon planning may rely on compressed futures rather than brute-force search."
+>
+  <article>
+    <div class="meta">Essay · Planning · Neuroscience</div>
+    <h1>Animals Don’t Plan by Enumerating the Future</h1>
+    <p class="lede">
+      One evening, I was thinking about a mouse. Not a particularly interesting
+      mouse. It was just a mouse in a maze, moving through corridors built by
+      someone else, making a decision that looked ordinary from the outside and
+      strangely deep once I started thinking about it.
+    </p>
+
+    <p>
+      The mouse reached a junction. It had to choose. And the question that came
+      to me was simple: <em>what, exactly, was going on in its head?</em>
+    </p>
+
+    <p>
+      Did it imagine every possible future? Did it explicitly search through the
+      tree of possible paths and compare them one by one? If so, the number of
+      futures would blow up very quickly. But the mouse does not look like it is
+      performing a giant symbolic search. It looks like it has a map of what the
+      world tends to do next.
+    </p>
+
+    <p>
+      And maybe that is the first important idea. <strong>We do not always plan by
+      searching the future. Sometimes we plan by remembering what the future tends
+      to look like.</strong>
+    </p>
+
+    <h2>A map of things that have not happened yet</h2>
+    <p>
+      One of the most elegant ideas in neuroscience is the successor
+      representation. At a high level, it asks: if I am in state <strong>s</strong>
+      now, what states am I likely to visit later? Not one specific future, not one
+      fixed trajectory, but a distribution of likely futures weighted by how far in
+      the future they are.
+    </p>
+
+    <Equation
+      expression={String.raw`M(s, s') = \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^t \mathbf{1}(s_t = s') \mid s_0 = s\right]`}
+      label="Successor representation: expected discounted future occupancy of state s' when starting from state s."
+    />
+
+    <p>
+      Here, <strong>s</strong> is the current state, <strong>s'</strong> is some
+      future state, <strong>γ</strong> is the discount factor, and
+      <strong>\mathbf{1}(s_t = s')</strong> is an indicator function that equals
+      1 when the system is in state <strong>s'</strong> at time <strong>t</strong>
+      and 0 otherwise. The expectation is taken over possible trajectories starting
+      from <strong>s</strong>. So the whole expression says: starting from state
+      <strong>s</strong>, how much expected future occupancy does the system assign
+      to state <strong>s'</strong> over time?
+    </p>
+
+    <p>
+      This is a compressive representation of the future. It does not tell you one
+      exact path. It tells you the structure of the world: what states tend to
+      follow from a given starting point, and how soon they tend to appear.
+      That is a very different thing from enumerating every possible branch.
+    </p>
+
+    <p>
+      There is an important limitation here, though. The successor
+      representation is predictive, but it is not a complete model of the world.
+      It tells us what states tend to follow under a particular policy. A world
+      model asks a different question: <em>what would happen if I took this action
+      instead?</em>
+    </p>
+
+    <p class="stacked-example">
+      <strong>SR:</strong> what tends to happen?<br />
+      <strong>World model:</strong> what would happen if...?
+    </p>
+
+    <p>
+      That distinction matters because it separates two different kinds of
+      computation. The successor representation compresses expected futures. A
+      world model tries to generate counterfactual futures under alternative
+      actions. The first is a map of likely transitions; the second is a machine
+      for imagining possibilities.
+    </p>
+
+    <Equation
+      expression={String.raw`V(s) = \sum_{s'} M(s, s') R(s')`}
+      label="State value equals the successor representation weighted by the reward associated with future states."
+    />
+
+    <p>
+      Here, <strong>R(s')</strong> is the reward associated with visiting state
+      <strong>s'</strong>. The value function <strong>V(s)</strong> tells you how
+      good a starting state is, given the likely future states that follow from it.
+      The breakthrough is that if the reward function changes, you do not
+      necessarily need to rebuild the entire world model from scratch. You can keep
+      the predictive structure and simply reweight it with the new goal.
+    </p>
+
+    <p>
+      This is a beautiful computational shortcut. It separates <em>what the world
+      is likely to do</em> from <em>what I care about right now</em>. The first can be
+      learned once; the second can change from day to day, or even from minute to
+      minute.
+    </p>
+
+    <h2>The mouse does not need to remember everything</h2>
+    <p>
+      Imagine a mouse that has explored a maze many times. The maze starts as a
+      collection of corridors, dead ends, and confusing loops. But with enough
+      experience, the maze becomes something else: a relationship between places, a
+      set of likely transitions, a rough topology of where things lead.
+    </p>
+
+    <p>
+      The mouse does not need to remember every step it has ever taken. It needs
+      enough structure to know which moves tend to be useful and which tend to be
+      traps. That is where predictive maps become so interesting. The future is
+      compressed.
+    </p>
+
+    <p>
+      Instead of thinking in the form
+    </p>
+
+    <p class="stacked-example">
+      A → B → C → D → E → goal
+    </p>
+
+    <p>
+      we can think more like this:
+    </p>
+
+    <p class="stacked-example">
+      from A, these are the states that tend to become possible next
+    </p>
+
+    <p>
+      That is not a literal list of exact trajectories. It is a compressed
+      predictive structure. It preserves the parts of the past that matter for the
+      future, rather than the exact sequence of every movement.
+    </p>
+
+    <p>
+      And perhaps that is a more useful kind of memory. The brain is not storing
+      every past path in perfect detail. It is learning the structure that makes
+      future paths likely.
+    </p>
+
+    <h2>But animals still do search</h2>
+    <p>
+      Of course, the mouse is not living entirely inside a predictive map.
+      Sometimes it does need to imagine. When a rat sits still, hippocampal place
+      cells can activate in sequences that resemble trajectories through the
+      environment. The animal is not physically moving, and yet, in some sense, it
+      is going somewhere.
+    </p>
+
+    <p>
+      This is one reason hippocampal replay is so interesting. The brain seems to
+      be able to take a compressed representation of the world and temporarily
+      unfold it into a trajectory. Sometimes that replay corresponds to something
+      that happened before; sometimes it resembles something that could happen next.
+      The boundary between remembering and imagining becomes strangely thin.
+    </p>
+
+    <Equation
+      expression={String.raw`s_t \xrightarrow{a_t} \hat{s}_{t+1} \xrightarrow{a_{t+1}} \hat{s}_{t+2} \rightarrow \cdots`}
+      label="Replay unfolds a compressed representation into a possible trajectory: state s_t leads to imagined next states through candidate actions."
+    />
+
+    <p>
+      Replay therefore sits between memory and planning. It takes a learned
+      structure and temporarily unfolds it into a possible trajectory. The brain is
+      not simply replaying raw experience. It is selectively simulating candidate
+      futures.
+    </p>
+
+    <p>
+      But replay is probably not random. It is not “play back everything equally.”
+      Some memories are more useful than others. This is where the idea of
+      prioritized replay becomes important: if replay is costly, then the system
+      should spend that computation on the experiences that are most likely to
+      improve future behavior.
+    </p>
+
+    <Equation
+      expression={String.raw`\text{priority}(m) \propto \frac{\text{expected decision benefit}}{\text{computational cost}}`}
+      label="A replay priority rule: spend simulation budget where the gain in decision quality is highest relative to the cost."
+    />
+
+    <p>
+      That raises a different question. Not simply, “what should I simulate?” but
+      “is this simulation worth doing?”
+    </p>
+
+    <h2>Perhaps planning starts before the decision</h2>
+    <p>
+      The classical picture of planning is often something like this:
+    </p>
+
+    <p class="stacked-example">
+      decision → search → action
+    </p>
+
+    <p>
+      But neuroscience suggests this is too narrow. Replay and simulation may happen
+      offline, long before the eventual decision. The system learns while nothing
+      urgent is happening. Then, when the real choice arrives, the decision can be
+      surprisingly cheap.
+    </p>
+
+    <p>
+      The architecture may look more like this:
+    </p>
+
+    <p class="stacked-example">
+      experience → replay / simulation → updated predictive representation → later
+      cheap evaluation → action
+    </p>
+
+    <p>
+      That is a major distinction. The brain can spend computation when it is cheap,
+      rather than only paying the full planning cost at the moment of choice.
+      Planning is not necessarily a single instantaneous act. It can be a slow,
+      distributed process that gradually changes the representations available when
+      the decision window finally arrives.
+    </p>
+
+    <h2>Grid cells and the geometry of memory</h2>
+    <p>
+      There is another piece of this puzzle I find difficult to ignore: grid cells.
+      Entorhinal representations seem to provide a structured coordinate system for
+      space, and computational models suggest they support more than simple
+      distance estimates. They may encode relational geometry: the way one part of
+      the environment relates to another, even when those states are far apart.
+    </p>
+
+    <p>
+      This matters because it suggests that some planning shortcuts are not about
+      explicit search at all. They are about representation. Instead of rolling out
+      every intermediate state, the system can reason with a compressed geometric
+      structure that already encodes the relevant relationships.
+    </p>
+
+    <Equation
+      expression={String.raw`V^{\pi}(s) = \mathbb{E}\left[\sum_{t=0}^{\infty} \gamma^t r_t \mid s_0 = s, \pi\right]`}
+      label="Expected discounted return from state s after following policy pi. The system accumulates rewards over time, weighted by gamma."
+    />
+
+    <p>
+      Here, <strong>V<sup>π</sup>(s)</strong> is the expected discounted return
+      starting at state <strong>s</strong> under policy <strong>π</strong>.
+      <strong>r<sub>t</sub></strong> is the reward received at time step
+      <strong>t</strong>, and <strong>γ</strong> is the discount factor that makes
+      rewards farther in the future matter less than immediate ones. This equation
+      is useful because it clarifies that value estimation is not just about the next
+      step. It is about a whole future stream of consequences. But the real power
+      comes from the representation that makes those consequences cheap to evaluate.
+    </p>
+
+    <h2>The Tolman-Eichenbaum Machine</h2>
+    <p>
+      If I wanted a concrete neural-network model that captures this way of
+      thinking, I would start with the Tolman-Eichenbaum Machine. The key idea is
+      that the system does not just learn “this exact sequence occurred.” It learns
+      that a certain kind of relationship exists between states and observations.
+      That is a deeper and more general form of structure learning.
+    </p>
+
+    <p>
+      This distinction matters. A model that only learns a story of transitions can
+      do well on familiar paths but struggle when the environment requires
+      abstraction. A model that learns the relationship itself can generalize more
+      readily to new situations because it has learned the underlying structure,
+      not just the specific sequence it happened to observe.
+    </p>
+
+    <p>
+      In a sense, the brain is learning <em>how to reason over structure</em>, not
+      only how to generate the next step in a trajectory.
+    </p>
+
+    <h2>What does this have to do with LLMs?</h2>
+    <p>
+      A large language model, in a simplified sense, does this:
+    </p>
+
+    <p class="stacked-example">
+      x<sub>1</sub>, x<sub>2</sub>, ..., x<sub>t</sub> → next-token prediction
+    </p>
+
+    <p>
+      This is extremely powerful. But it also tends to turn long-horizon reasoning
+      into a serial chain of symbols. One thought leads to the next, each step
+      depending on the previous one. Errors compound. The model is not obviously
+      building a predictive map of the environment in the same way a hippocampal
+      system might.
+    </p>
+
+    <p>
+      Imagine a language model agent with a latent state <strong>z<sub>t</sub></strong>,
+      a predictive representation over likely futures, a memory of previous
+      trajectories, and a learned world model capable of simulating counterfactual
+      actions. When a new task arrives, it would not necessarily generate a long
+      chain of reasoning from scratch. It could first retrieve relevant predictive
+      structure and memories, estimate whether additional simulation is worth its
+      cost, and only then roll out the futures that matter.
+    </p>
+
+    <p>
+      In that picture, reasoning is no longer synonymous with generating more
+      tokens. Some computation has been amortized into the representation; some
+      lives in memory; some is performed through selective simulation at decision
+      time. The system is learning not only what to say next, but when it is worth
+      thinking deeper.
+    </p>
+
+    <p>
+      A more brain-like planner might instead look roughly like this:
+    </p>
+
+    <p class="stacked-example">
+      world model → predictive map → relevant memory retrieval → selective
+      simulation → policy / action
+    </p>
+
+    <p>
+      The difference is not simply more depth. It is a different architecture for
+      memory and evaluation. The system is representing the future in a more
+      structured way, and then deciding which parts of that future deserve active
+      simulation.
+    </p>
+
+    <h2>The deeper lesson: long-horizon intelligence may be about temporal abstraction</h2>
+    <p>
+      This is probably the part I keep coming back to. The real challenge is not
+      just “how do we search farther?” It is “how do we plan at the right level of
+      abstraction?”
+    </p>
+
+    <p>
+      Consider a trip. You do not normally plan every individual movement in a
+      literal time-step sequence. You plan at a higher level: get to Tokyo, then to
+      the hotel, then to dinner, then to Kyoto. Each of those steps contains its
+      own local decision process. This is temporal abstraction. The brain is very
+      good at this.
+    </p>
+
+    <p>
+      That may be the core lesson from the neuroscience literature: the stronger the
+      abstraction, the less brute-force search is needed. A good predictive
+      representation can let an agent reason over long horizons without replaying a
+      giant number of low-level states.
+    </p>
+
+    <Equation
+      expression={String.raw`\min_{\pi} \mathbb{E}[\mathrm{cost}(\pi)] \quad \text{subject to} \quad Q(\pi) \ge Q_{\min}`}
+      label="Choose a policy that minimizes expected computational cost while keeping task performance above a minimum quality threshold."
+    />
+
+    <Equation
+      expression={String.raw`\mathrm{EVC}(\text{think}\mid s) = \mathbb{E}[V_{\text{after thinking}} - V_{\text{before thinking}}] - C_{\text{thinking}}`}
+      label="Expected value of computation: the benefit of additional reasoning minus the cost of that reasoning."
+    />
+
+    <p>
+      Here, <strong>π</strong> is the policy, <strong>cost(π)</strong> is the
+      computational cost of following that policy, and <strong>Q(π)</strong> is the
+      quality of the resulting behavior. The constraint says: do not just minimize
+      cost; minimize cost while ensuring the system still performs above a minimum
+      acceptable quality threshold. This is a much more realistic framing of
+      intelligence than “more search is always better.” In the brain, the choice is
+      often not “search more or less,” but “which abstraction is worth using, and
+      when is simulation actually worth its compute?”
+    </p>
+
+    <p>
+      The sharper version of that point is simple: a capable planner must learn not
+      only what action to take, but whether additional computation is worth paying
+      for. That is the bridge between predictive maps, replay, and the final
+      decision itself.
+    </p>
+
+    <h2>Maybe the future is not something we search</h2>
+    <p>
+      I keep coming back to the mouse at the junction. There are multiple corridors
+      ahead. Somewhere in its brain, memories are being retrieved. A predictive map
+      is being consulted. A trajectory may be replayed. Perhaps the animal has
+      already simulated this situation many times before, without knowing exactly
+      when the decision would finally arrive.
+    </p>
+
+    <p>
+      Then it moves. We do not know what the mouse is experiencing in any intimate
+      way, but the computational picture is compelling. Maybe intelligence is not
+      primarily the ability to search farther into the future. Maybe it is the
+      ability to <em>compress the future into useful representations</em>.
+    </p>
+
+    <p>
+      To know which memories matter. To simulate only the branches worth
+      simulating. To plan at the right temporal scale. And perhaps most
+      importantly: to learn when not to plan at all.
+    </p>
+
+    <p>
+      That is the question worth asking for AI. Not just, “How do we make models
+      think longer?” but also, “What structure should they learn so they do not
+      need to think longer than necessary?” A system that can remember without
+      replaying everything, predict without enumerating everything, and plan
+      without expanding everything may be much closer to real intelligence than a
+      system that simply generates more tokens.
+    </p>
+
+    <h2>References</h2>
+    <ol class="references">
+      <li>
+        Stachenfeld, K. S., Botvinick, M. M., &amp; Gershman, S. J. (2017).
+        <em>The hippocampus as a predictive map</em>. Nature Neuroscience.
+      </li>
+      <li>
+        Whittington, J. C. R., et al. (2020). <em>The Tolman-Eichenbaum Machine:
+        Unifying space and behavior through latent generative models</em>. Cell.
+      </li>
+      <li>
+        Jensen, B. Y., Hennequin, G., &amp; Mattar, M. G. (2024).
+        <em>A recurrent network model of planning explains hippocampal replay and
+        human behavior</em>. Nature.
+      </li>
+      <li>
+        Mattar, M. G., &amp; Daw, N. D. (2021). Prioritized memory access explains
+        planning and replay in hippocampal–prefrontal circuits. <em>Nature
+        Neuroscience</em>.
+      </li>
+      <li>
+        O’Reilly, R. C., et al. (2014). The neural basis of cognitive maps and
+        planning in the hippocampus. <em>Annual Review of Psychology</em>.
+      </li>
+    </ol>
+  </article>
+</BaseLayout>
+
+<style>
+  .stacked-example {
+    margin: 22px 0;
+    padding: 18px 20px;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-family: "DM Sans", sans-serif;
+    line-height: 1.8;
+  }
+
+  .references {
+    padding-left: 20px;
+    color: var(--muted);
+  }
+
+  .references li {
+    margin-bottom: 10px;
+    line-height: 1.7;
+  }
+</style>
