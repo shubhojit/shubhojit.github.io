@@ -45,6 +45,12 @@ import Equation from "../../components/Equation.astro";
       expression={String.raw`C_{\mathrm{train}} \approx 6ND`}
       label="Training compute is approximately six times the number of parameters times the number of training tokens"
     />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Training work grows with both the
+      number of model parameters and the number of training tokens. With the
+      model and recipe fixed, twice as many tokens means roughly twice the work
+      under this estimate.
+    </p>
     <p>
       Here, <strong>C<sub>train</sub></strong> is training computation in
       floating-point operations, <strong>N</strong> is the number of model
@@ -74,6 +80,11 @@ import Equation from "../../components/Equation.astro";
       expression={String.raw`W_{\mathrm{prefill,attn}} = O(LP^2d)`}
       label="Prefill attention work grows in proportion to layers times prompt length squared times hidden width"
     />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> A longer prompt makes prefill
+      attention grow roughly with the square of its length. Double the prompt,
+      and this part of the work can approach four times as much.
+    </p>
     <p>
       <strong>L</strong> is the number of transformer layers, <strong>P</strong>
       is prompt length in tokens, and <strong>d</strong> is the hidden width.
@@ -95,6 +106,11 @@ import Equation from "../../components/Equation.astro";
       expression={String.raw`W_{\mathrm{decode,attn}} = O\!\left(Ld\left[GP + \frac{G(G-1)}{2}\right]\right)`}
       label="Decode attention work grows with layers and hidden width times generated tokens multiplied by prompt length plus the triangular sum of earlier generated tokens"
     />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Every generated token attends to
+      the prompt, and later tokens also attend to earlier generated tokens. A
+      longer prompt and a longer answer both increase this attention work.
+    </p>
     <p>
       <strong>G</strong> is the number of generated tokens. The term GP counts
       each generated token attending over the original prompt. The sum
@@ -120,6 +136,11 @@ import Equation from "../../components/Equation.astro";
       expression={String.raw`M_{\mathrm{KV}} \approx 2LBTn_{\mathrm{kv}}d_hb`}
       label="KV cache memory is approximately two times layers, batch size, context length, KV heads, head dimension, and bytes per value"
     />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The cache grows with the number of
+      layers, sequences, cached tokens, KV heads, and the size of each stored
+      value. The factor of two is for keys and values.
+    </p>
     <p>
       <strong>M<sub>KV</sub></strong> is cache memory in bytes. The factor two
       accounts for keys and values. <strong>L</strong> is the number of layers,
@@ -204,9 +225,13 @@ import Equation from "../../components/Equation.astro";
       expression={String.raw`\min_{\pi}\; \mathbb{E}[\mathrm{serving\ cost}(\pi)] \quad \text{subject to} \quad Q(\pi) \ge Q_{\min}`}
       label="Choose a system policy that minimizes expected serving cost while keeping task quality above a minimum target"
     />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Reduce the expected cost of
+      serving a request, but only among choices that meet the minimum quality
+      target.
+    </p>
     <p>
-      In plain language: reduce the expected cost of serving a request, but
-      only among choices that still meet a minimum quality target. The policy
+      The policy
       π might change context selection, representation, or generation length.
       Q(π) is a task-appropriate quality measure, and Q<sub>min</sub> is the
       lowest acceptable score. Cost could mean compute, latency, memory, money,

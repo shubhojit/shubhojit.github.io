@@ -50,7 +50,7 @@ import Equation from "../../components/Equation.astro";
       label="Successor representation: expected discounted future occupancy of state s' when starting from state s."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> Start at <strong>s</strong> and ask
       how often you expect to reach <strong>s'</strong>. Count likely visits,
       but give less weight to visits farther in the future.
@@ -100,7 +100,7 @@ import Equation from "../../components/Equation.astro";
       label="State value equals the successor representation weighted by the reward associated with future states."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> Add up the likely future visits,
       giving more credit to places that are more rewarding. The predicted future
       and the current goal stay separate, so a new goal can change the value
@@ -188,7 +188,7 @@ import Equation from "../../components/Equation.astro";
       label="Replay unfolds a compressed representation into a possible trajectory: state s_t leads to imagined next states through candidate actions."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> Replay takes what has been learned
       and imagines a route one step at a time: from here, take this action, then
       see where it might lead. That puts replay between memory and planning.
@@ -207,7 +207,7 @@ import Equation from "../../components/Equation.astro";
       label="A replay priority rule: spend simulation budget where the gain in decision quality is highest relative to the cost."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> Replay memories that are likely to
       help a decision, especially when they are cheap to simulate.
     </p>
@@ -271,7 +271,7 @@ import Equation from "../../components/Equation.astro";
       label="Expected discounted return from state s after following policy pi. The system accumulates rewards over time, weighted by gamma."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> A state's value is the reward you
       expect to collect from there onward, with rewards farther in the future
       counting less.
@@ -388,7 +388,7 @@ import Equation from "../../components/Equation.astro";
       label="Choose a policy that minimizes expected computational cost while keeping task performance above a minimum quality threshold."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> Find a way to act that uses as
       little computation as possible, while still meeting the minimum quality
       bar.
@@ -399,7 +399,7 @@ import Equation from "../../components/Equation.astro";
       label="Expected value of computation: the benefit of additional reasoning minus the cost of that reasoning."
     />
 
-    <p class="stacked-example">
+    <p class="math-translation">
       <strong>Translating the math:</strong> Keep thinking when the improvement
       you expect from more thought is worth more than the computation it costs.
     </p>
