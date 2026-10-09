@@ -2,12 +2,12 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 ---
 <BaseLayout
-  title="Precision on a Budget — Shubhojit"
+  title="CADO: Precision on a Budget — Shubhojit"
   description="A research hypothesis on using activation statistics to allocate limited high-precision, on-chip memory and improve inference quality–latency tradeoffs."
 >
   <article>
     <div class="meta">AI Systems · Quantization · Inference</div>
-    <h1>Precision on a Budget</h1>
+    <h1>CADO: Precision on a Budget</h1>
     <p class="lede">
       Can activation statistics help a model decide where scarce high-precision,
       on-chip memory is most valuable?
@@ -74,39 +74,86 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     <h2>A toy prototype: CADO</h2>
     <p>
       One concrete starting point is to flag activation columns whose maximum
-      magnitude across a batch exceeds a threshold. Route those columns through
-      a higher-precision matrix multiply, and quantize the remaining activation
-      and weight rows for an INT8 multiply. This captures the decomposition
-      behind Cache-Aware Dynamic Outlier Offloading (CADO): a shared low-
-      precision path plus a smaller high-precision path.
+      magnitude across a batch exceeds a threshold. Let <strong>X</strong> be an
+      activation matrix, and let <strong>M</strong> be the mask selecting the
+      outlier columns. Then a compact approximation looks like this:
+    </p>
+
+    <div class="constraint" role="math" aria-label="Approximate matrix product as exact high-precision outlier terms plus quantized low-precision terms">
+      Y ≈ X<sub>out</sub>W<sub>out</sub> + Q(X<sub>normal</sub>)Q(W<sub>normal</sub>)
+    </div>
+
+    <p class="math-translation">
+      <strong>Readable version:</strong> keep the outlier part of the computation in
+      a higher-precision path, and quantize the remaining bulk. In other words,
+      compute the important subset exactly and let the rest live in a cheaper,
+      lower-precision representation.
+    </p>
+
+    <p class="math-translation">
+      <strong>Translating the math:</strong> split the activations and weights into
+      an <em>outlier</em> set and a <em>normal</em> set. The outlier set is computed
+      in a higher-precision path, while the normal set is compressed to a lower-
+      precision representation. The whole point is to protect the small subset that
+      drives error while keeping the rest cheap.
+    </p>
+
+    <p>
+      In other words, the system is trying to solve a routing problem: choose a
+      small subset of values to preserve exactly, and let the rest live in a
+      cheaper representation. That is the heart of the hypothesis.
+    </p>
+
+    <p>
+      This is the idea behind the public prototype repository:
+      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/tree/master" target="_blank" rel="noreferrer">CADO on GitHub</a>.
     </p>
 
     <pre><code>{`import numpy as np
 
 
 def cado_matrix_multiply(x, weights, threshold=6.0):
-    """Illustrate batch-level outlier routing for x @ weights."""
+    """Toy implementation of a simple CADO-style decomposition.
+
+    Idea:
+      1. Identify columns whose max magnitude exceeds a threshold.
+      2. Compute those columns in full precision.
+      3. Quantize the remaining columns to int8 and reconstruct them.
+      4. Add the two contributions back together.
+
+    This is a correctness-oriented sketch, not a cache-aware kernel.
+    """
     x = np.asarray(x, dtype=np.float32)
     weights = np.asarray(weights, dtype=np.float32)
+
     if x.ndim != 2 or weights.ndim != 2 or x.shape[1] != weights.shape[0]:
         raise ValueError("Expected compatible 2D activation and weight matrices")
     if x.shape[0] == 0 or x.shape[1] == 0 or weights.shape[1] == 0:
         raise ValueError("Matrices must have non-empty dimensions")
 
+    # Step 1: identify the outlier columns for this batch.
+    # A column is treated as an outlier if any element in that column is large.
     outlier_mask = np.max(np.abs(x), axis=0) >= threshold
     result = np.zeros((x.shape[0], weights.shape[1]), dtype=np.float32)
 
+    # Step 2: keep the high-impact subset in a dense, higher-precision path.
     if np.any(outlier_mask):
         result += x[:, outlier_mask] @ weights[outlier_mask, :]
 
+    # Step 3: quantize the remaining columns to int8 and reconstruct the product.
     normal_mask = ~outlier_mask
     if np.any(normal_mask):
         x_normal = x[:, normal_mask]
         w_normal = weights[normal_mask, :]
+
+        # Scale each matrix so values fit cleanly into signed int8.
         scale_x = max(float(np.max(np.abs(x_normal))) / 127.0, 1e-12)
         scale_w = max(float(np.max(np.abs(w_normal))) / 127.0, 1e-12)
+
         x_int8 = np.clip(np.round(x_normal / scale_x), -127, 127).astype(np.int8)
         w_int8 = np.clip(np.round(w_normal / scale_w), -127, 127).astype(np.int8)
+
+        # Reconstruct the low-precision contribution and add it back.
         result += (x_int8.astype(np.int32) @ w_int8.astype(np.int32)) * (scale_x * scale_w)
 
     return result`}</code></pre>
@@ -175,6 +222,31 @@ def cado_matrix_multiply(x, weights, threshold=6.0):
       efficiently each unit of work is represented and moved. Both matter, but
       they are different budgets—and should be measured separately.
     </p>
+
+    <h2>References</h2>
+    <ul>
+      <li>
+        <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noreferrer">LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</a>. Dettmers et al. 2022.
+      </li>
+      <li>
+        <a href="https://arxiv.org/abs/2211.10438" target="_blank" rel="noreferrer">SmoothQuant: Accurate and Efficient 8-bit Quantization for Large Language Models</a>. Xiao et al. 2022.
+      </li>
+      <li>
+        <a href="https://arxiv.org/abs/2306.00978" target="_blank" rel="noreferrer">AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</a>. Lin et al. 2023.
+      </li>
+      <li>
+        <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/tree/master" target="_blank" rel="noreferrer">CADO: Cache-Aware Dynamic Outlier Offloading</a>. Public prototype repository.
+      </li>
+    </ul>
+
+    <h2>Cite this post</h2>
+    <pre><code>{`@article{shubhojit2026cado,
+  title   = "CADO: Precision on a Budget",
+  author  = "Mallick, Shubhojit",
+  journal = "https://shubhojit.github.io",
+  year    = "2026",
+  url     = "https://shubhojit.com/writing/precision-on-a-budget"
+}`}</code></pre>
   </article>
 </BaseLayout>
 
