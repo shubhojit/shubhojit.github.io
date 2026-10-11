@@ -1,0 +1,233 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Equation from "../../components/Equation.astro";
+---
+<BaseLayout
+  title="What the FFT Reveals About Gradient Exclusion — AI Research"
+  description="A Fourier-domain interpretation of gradient exclusion in spatially adaptive reflection refinement, and why it does not directly define an FFT-based tile router."
+>
+  <article>
+    <div class="meta">Computer Vision · Fourier Analysis · Optimization</div>
+    <h1>What the FFT Reveals About Gradient Exclusion</h1>
+    <p class="lede">
+      <em>Can the frequency domain tell us where an image needs refinement?</em>
+    </p>
+
+    <p>
+      Suppose you are trying to separate a photograph taken through glass into
+      two layers: the scene behind the glass and the reflection on its surface.
+      You have an initial estimate of the scene, a residual that captures what
+      the estimate has not explained, and a limited budget for improving the
+      result. You cannot refine every region equally. Somewhere in the image,
+      your next update needs to do more good than harm.
+    </p>
+
+    <p>
+      The question is where to spend it. In the
+      <a href="https://github.com/shubhojit/adaptive-reflection-refinement" target="_blank" rel="noreferrer">adaptive reflection-refinement prototype</a>,
+      a router scores image tiles using the overlap between the gradients of the
+      estimated transmission and its residual. Tiles with stronger overlap
+      receive priority for refinement.
+    </p>
+
+    <p>
+      It is a spatial heuristic. But gradients have another interpretation:
+      they are operators whose responses depend on spatial frequency. That
+      suggests a tempting possibility. <strong>If gradient exclusion is
+      sensitive to spatial scale, could its Fourier representation tell us
+      which regions deserve refinement?</strong>
+    </p>
+
+    <p>
+      To answer that, we need to distinguish three things that are easy to
+      conflate: the frequency response of a finite difference, the actual
+      objective implemented by the code, and the information required to make a
+      useful routing decision. The connection between them is more subtle than it
+      first appears.
+    </p>
+
+    <h2>First, what are we trying to separate?</h2>
+    <p>
+      Let <strong>I</strong> be the observed image, <strong>T</strong> the
+      clean transmission layer we want, and <strong>R</strong> the reflection
+      layer. A simple mixture model is:
+    </p>
+    <Equation
+      expression={String.raw`I = (1-\alpha)T + \alpha R`}
+      label="Observed image I is a mixture of transmission T and reflection R with mixing strength alpha"
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Each observed pixel mixes the
+      scene behind the glass with a reflected scene. Given only the mixture,
+      many different pairs of layers could explain the same image.
+    </p>
+    <p>
+      That ambiguity matters. The prototype's gradient-exclusion term is a
+      prior: it favors decompositions in which transmission and residual
+      gradients do not strongly coincide. It is a useful modeling choice, not a
+      physical law that tells us exactly which layer produced each edge.
+    </p>
+
+    <h2>What does a gradient actually measure?</h2>
+    <p>
+      Imagine three images. One contains a broad, slowly varying patch of
+      brightness. Another contains a series of sharp edges. The third alternates
+      between bright and dark pixels. A finite difference responds differently to
+      each. Broad variations tend to produce small differences; rapid changes
+      produce larger ones. But the response is not unlimited: on a discrete pixel
+      grid, the exact response is shaped by the sampling structure itself.
+    </p>
+    <p>
+      Under the periodic-boundary convention used by the discrete Fourier
+      transform, consider a one-dimensional signal <strong>x[n]</strong>. Its forward
+      difference is <strong>x[n+1] − x[n]</strong>. The FFT makes that intuition precise:
+      a shift becomes multiplication by a complex phase.
+    </p>
+    <Equation
+      expression={String.raw`\widehat{D_x x}(\omega_x) = \left(e^{i\omega_x}-1\right)\hat{x}(\omega_x), \qquad \left|e^{i\omega_x}-1\right|^2 = 4\sin^2\!\left(\frac{\omega_x}{2}\right)`}
+      label="The Fourier transform of a forward finite difference multiplies each frequency by e to the i omega minus one, with squared magnitude four sine squared of omega over two"
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> A finite difference suppresses very
+      slow variation and responds more strongly as spatial frequency rises. On a
+      pixel grid, the exact gain is the sine-shaped factor shown here—not simply
+      frequency squared at every scale.
+    </p>
+    <p>
+      The useful mental model is that a gradient is not merely a detector of
+      edges. It is a scale-sensitive operator, and its response is determined by
+      the spatial frequencies present in the signal. In two dimensions, horizontal
+      and vertical differences have their own frequency responses. Together they
+      give a frequency weight <strong>4 sin²(ω<sub>x</sub>/2) + 4 sin²(ω<sub>y</sub>/2)</strong>.
+      At low frequencies this behaves approximately like
+      <strong>ω<sub>x</sub>² + ω<sub>y</sub>²</strong>, which is the familiar
+      continuous-gradient intuition. Near the grid's highest frequencies,
+      however, the discrete expression is the accurate one.
+    </p>
+
+    <h2>The subtlety: the loss is local, but the FFT is global</h2>
+    <p>
+      Let <strong>T₀</strong> be the initial estimate and
+      <strong>R₀ = I − T₀</strong> its residual. For each pixel, the prototype
+      forms a gradient inner product, summing horizontal and vertical
+      products (and color channels), then squares that scalar and sums over
+      pixels:
+    </p>
+    <Equation
+      expression={String.raw`q_p = \sum_c \left[D_xT_0(p,c)D_xR_0(p,c) + D_yT_0(p,c)D_yR_0(p,c)\right], \qquad L_{\mathrm{excl}} \propto \sum_p q_p^2`}
+      label="At each pixel q is the sum of transmission and residual gradient products across axes and channels; the exclusion loss sums the squared q values"
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> At each location, the code measures
+      the signed alignment between transmission and residual gradients, then
+      penalizes its square. Strong alignment in either direction contributes;
+      the penalty is local before it is aggregated.
+    </p>
+    <p>
+      Here is where the apparently straightforward Fourier interpretation becomes
+      interesting. The gradient operator is linear. The exclusion loss built from
+      its outputs is not. The prototype first computes a local alignment at each
+      pixel, then squares that quantity before aggregating it. The order of
+      operations matters: squaring a local quantity is not equivalent to
+      comparing the global frequency energies of the two images.
+    </p>
+    <p>
+      The FFT gives a clean spectral interpretation of the gradient operator. It
+      does not license replacing the complete loss with a frequency-by-frequency
+      comparison. Multiplication in image space becomes convolution in frequency
+      space, so pointwise products mix frequency components. The loss is therefore
+      not just a per-frequency comparison between transmission and reflection.
+    </p>
+
+    <h2>Knowing the frequencies isn't the same as knowing where to refine</h2>
+    <p>
+      The current router scores each tile using the mean absolute spatial
+      gradient overlap in the initial estimate and residual. That has a direct
+      local interpretation: these are the places where the current estimate
+      exhibits the pattern that the refinement prior penalizes. The router then
+      spends its finite update budget on the highest-scoring tiles.
+    </p>
+    <p>
+      A whole-image FFT answers a different question. It describes how much
+      variation exists at different spatial scales across the image, but it does
+      not say <em>where</em> a particular frequency occurs. A sharp edge in one
+      corner and the same edge elsewhere can produce similar global spectra. That
+      makes a global spectrum a poor direct replacement for a spatial tile score.
+    </p>
+    <p>
+      We could compute local FFTs tile by tile, or use a windowed transform such
+      as a short-time Fourier transform. Those choices recover some location
+      information, but introduce new decisions: window size, overlap, boundary
+      handling, and which frequency bands to score. They also add routing work.
+      Since the experiment's premise is a limited refinement budget, that overhead
+      must be measured rather than assumed to be free.
+    </p>
+
+    <h2>How would we know if the FFT helps?</h2>
+    <p>
+      The FFT is most useful here as a hypothesis generator. We could ask whether
+      local frequency features predict which tile benefits most from one
+      refinement update. To test that, keep the starting estimate, candidate
+      tiles, update rule, and number of selected tiles fixed. Then compare:
+    </p>
+    <ul>
+      <li>the existing spatial gradient-overlap score;</li>
+      <li>a local FFT score, defined in advance from selected frequency bands;</li>
+      <li>uniform allocation, plus random routing as a simple control.</li>
+    </ul>
+    <p>
+      For a rigorous comparison, distinguish the <strong>actual refinement
+      benefit</strong> from the exclusion score itself. For candidate tile
+      <strong>i</strong>, define an oracle improvement:
+    </p>
+    <Equation
+      expression={String.raw`\Delta_i = \mathcal{E}(T_0) - \mathcal{E}(T_0^{(i)})`}
+      label="Oracle improvement for tile i is the reduction in reconstruction error after applying the candidate refinement update"
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> A positive <strong>Δ<sub>i</sub></strong>
+      means the update improved reconstruction quality. The router is not trying to
+      identify interesting frequencies in the abstract; it is trying to prioritize
+      updates that produce real benefit under a fixed budget.
+    </p>
+    <p>
+      Evaluate the same synthetic scenes and budgets, report reconstruction quality
+      against the known clean layer, and include both refinement time and end-to-end
+      time with routing overhead. A ranking metric such as Spearman correlation
+      between candidate scores and measured <strong>Δ<sub>i</sub></strong> values
+      can be informative. The key question is whether the FFT-based strategy
+      predicts useful refinement better than the existing score, and whether the
+      improvement justifies the extra computation.
+    </p>
+
+    <h2>What the Fourier view actually buys us</h2>
+    <p>
+      The FFT does not reveal a frequency-domain router hiding inside the
+      existing prototype. What it reveals is a more precise interpretation of
+      the gradient-exclusion prior. Finite differences weight spatial variation
+      according to frequency, while the pointwise exclusion loss couples these
+      variations through local products. The resulting objective is more
+      complicated than a simple comparison of transmission and residual energy at
+      each frequency.
+    </p>
+    <p>
+      That distinction matters because the router is not trying to characterize
+      an image for its own sake. It is trying to decide where a limited amount of
+      computation will be most useful. A global spectrum can tell us which scales
+      are present. Local spectral features may tell us more about where those
+      scales occur. But neither automatically tells us which refinement update
+      will improve the reconstruction.
+    </p>
+    <p>
+      That last question is empirical. The next step is not to replace the
+      spatial router with an FFT. It is to test whether local frequency
+      information predicts refinement benefit better than the existing score and
+      whether the gain is worth its computational cost.
+    </p>
+    <p>
+      <strong>The interesting connection is not that gradients have a Fourier
+      representation. It is that understanding the representation may help us ask a
+      better question about where computation should go.</strong>
+    </p>
+  </article>
+</BaseLayout>
