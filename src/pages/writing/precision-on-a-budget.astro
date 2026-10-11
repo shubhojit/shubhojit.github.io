@@ -42,9 +42,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     </div>
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Minimize end-to-end latency, while
-      meeting the minimum quality target and keeping the working set within the
-      fast-memory capacity.
+      <strong>Translating the math:</strong> Choose a routing policy that makes
+      the full request as fast as possible. It is only acceptable if task
+      quality stays at or above <strong>Q<sub>min</sub></strong> and the
+      fast-memory working set stays within capacity <strong>C</strong>. A
+      faster policy that violates either limit is not a solution.
     </p>
 
     <p>
@@ -84,18 +86,14 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
     </div>
 
     <p class="math-translation">
-      <strong>Readable version:</strong> keep the outlier part of the computation in
-      a higher-precision path, and quantize the remaining bulk. In other words,
-      compute the important subset exactly and let the rest live in a cheaper,
-      lower-precision representation.
-    </p>
-
-    <p class="math-translation">
-      <strong>Translating the math:</strong> split the activations and weights into
-      an <em>outlier</em> set and a <em>normal</em> set. The outlier set is computed
-      in a higher-precision path, while the normal set is compressed to a lower-
-      precision representation. The whole point is to protect the small subset that
-      drives error while keeping the rest cheap.
+      <strong>Translating the math:</strong> Split the inner dimensions of the
+      activation matrix <strong>X</strong> and weight matrix <strong>W</strong>
+      into selected outlier columns and the remaining normal columns. Multiply
+      the outlier subset in higher precision; quantize the normal subset with
+      <strong>Q</strong> and multiply that more cheaply. The two contributions
+      are added to approximate <strong>Y</strong>. The approximation sign
+      matters: quantization introduces error, and identifying outliers does
+      not by itself guarantee that those values are the most important ones.
     </p>
 
     <p>

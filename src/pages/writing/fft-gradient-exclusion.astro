@@ -26,7 +26,7 @@ import Equation from "../../components/Equation.astro";
       The question is where to spend it. In the
       <a href="https://github.com/shubhojit/adaptive-reflection-refinement" target="_blank" rel="noreferrer">adaptive reflection-refinement prototype</a>,
       a router scores image tiles using the overlap between the gradients of the
-      estimated transmission and its residual. Tiles with stronger overlap
+      estimated transmission and its residual [2]. Tiles with stronger overlap
       receive priority for refinement.
     </p>
 
@@ -57,15 +57,20 @@ import Equation from "../../components/Equation.astro";
       label="Observed image I is a mixture of transmission T and reflection R with mixing strength alpha"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> Each observed pixel mixes the
-      scene behind the glass with a reflected scene. Given only the mixture,
-      many different pairs of layers could explain the same image.
+      <strong>Translating the math:</strong> At each pixel, <strong>I</strong>
+      is a blend of the scene behind the glass, <strong>T</strong>, and the
+      reflection, <strong>R</strong>. The number <strong>α</strong> controls
+      their relative contributions: when it is near zero, the transmission
+      dominates; when it is larger, the reflection contributes more. This
+      model describes the blend, but one observed image usually cannot tell us
+      the two original layers uniquely.
     </p>
     <p>
       That ambiguity matters. The prototype's gradient-exclusion term is a
       prior: it favors decompositions in which transmission and residual
-      gradients do not strongly coincide. It is a useful modeling choice, not a
-      physical law that tells us exactly which layer produced each edge.
+      gradients do not strongly coincide, following a line of work on
+      reflection separation [1]. It is a useful modeling choice, not a physical
+      law that tells us exactly which layer produced each edge.
     </p>
 
     <h2>What does a gradient actually measure?</h2>
@@ -81,17 +86,20 @@ import Equation from "../../components/Equation.astro";
       Under the periodic-boundary convention used by the discrete Fourier
       transform, consider a one-dimensional signal <strong>x[n]</strong>. Its forward
       difference is <strong>x[n+1] − x[n]</strong>. The FFT makes that intuition precise:
-      a shift becomes multiplication by a complex phase.
+      a shift becomes multiplication by a complex phase [3].
     </p>
     <Equation
       expression={String.raw`\widehat{D_x x}(\omega_x) = \left(e^{i\omega_x}-1\right)\hat{x}(\omega_x), \qquad \left|e^{i\omega_x}-1\right|^2 = 4\sin^2\!\left(\frac{\omega_x}{2}\right)`}
       label="The Fourier transform of a forward finite difference multiplies each frequency by e to the i omega minus one, with squared magnitude four sine squared of omega over two"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> A finite difference suppresses very
-      slow variation and responds more strongly as spatial frequency rises. On a
-      pixel grid, the exact gain is the sine-shaped factor shown here—not simply
-      frequency squared at every scale.
+      <strong>Translating the math:</strong> The first part says that taking a
+      one-pixel difference multiplies each Fourier component of <strong>x</strong>
+      by <strong>e<sup>iωₓ</sup> − 1</strong>; shifting a signal becomes a
+      phase change in frequency space. The second part gives the squared
+      strength of that response. It is small for slowly changing patterns and
+      grows toward the highest representable frequency, following the sine
+      curve rather than a simple frequency-squared rule across the whole grid.
     </p>
     <p>
       The useful mental model is that a gradient is not merely a detector of
@@ -118,10 +126,14 @@ import Equation from "../../components/Equation.astro";
       label="At each pixel q is the sum of transmission and residual gradient products across axes and channels; the exclusion loss sums the squared q values"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> At each location, the code measures
-      the signed alignment between transmission and residual gradients, then
-      penalizes its square. Strong alignment in either direction contributes;
-      the penalty is local before it is aggregated.
+      <strong>Translating the math:</strong> At pixel <strong>p</strong>, the
+      code multiplies the horizontal and vertical gradients of the estimated
+      transmission <strong>T₀</strong> by the matching gradients of the residual
+      <strong>R₀</strong>, then adds across color channels <strong>c</strong>.
+      That signed alignment is <strong>q<sub>p</sub></strong>. The loss squares
+      it at each pixel and sums over the image, so strong overlap is penalized
+      whether its sign is positive or negative. This is a modeling penalty, not
+      a direct measure of whether the recovered layers are physically correct.
     </p>
     <p>
       Here is where the apparently straightforward Fourier interpretation becomes
@@ -185,10 +197,14 @@ import Equation from "../../components/Equation.astro";
       label="Oracle improvement for tile i is the reduction in reconstruction error after applying the candidate refinement update"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> A positive <strong>Δ<sub>i</sub></strong>
-      means the update improved reconstruction quality. The router is not trying to
-      identify interesting frequencies in the abstract; it is trying to prioritize
-      updates that produce real benefit under a fixed budget.
+      <strong>Translating the math:</strong> <strong>𝓔</strong> is the
+      reconstruction error, and <strong>T₀<sup>(i)</sup></strong> is the
+      estimate after applying an update to candidate tile <strong>i</strong>.
+      The difference is the error saved by spending an update there: a positive
+      <strong>Δ<sub>i</sub></strong> means the tile helped, zero means no
+      change, and a negative value means it made the result worse. This is an
+      oracle score for testing routers, not information available to a router
+      at deployment when the clean image is unknown.
     </p>
     <p>
       Evaluate the same synthetic scenes and budgets, report reconstruction quality
@@ -229,5 +245,27 @@ import Equation from "../../components/Equation.astro";
       representation. It is that understanding the representation may help us ask a
       better question about where computation should go.</strong>
     </p>
+
+    <h2>References</h2>
+    <ul>
+      <li>
+        <a href="https://openaccess.thecvf.com/content_cvpr_2018/html/Zhang_Single_Image_Reflection_CVPR_2018_paper.html" target="_blank" rel="noreferrer">Single Image Reflection Separation With Perceptual Losses</a>. Zhang et al. 2018.
+      </li>
+      <li>
+        <a href="https://github.com/shubhojit/adaptive-reflection-refinement" target="_blank" rel="noreferrer">Spatially Adaptive Reflection Refinement</a>. Public prototype repository.
+      </li>
+      <li>
+        <a href="https://numpy.org/doc/stable/reference/routines.fft.html" target="_blank" rel="noreferrer">Discrete Fourier Transform (numpy.fft)</a>. NumPy documentation.
+      </li>
+    </ul>
+
+    <h2>Cite this post</h2>
+    <pre><code>{`@article{shubhojit2026fftgradientexclusion,
+  title   = "What the FFT Reveals About Gradient Exclusion",
+  author  = "Mallick, Shubhojit",
+  journal = "https://shubhojit.github.io",
+  year    = "2026",
+  url     = "https://shubhojit.github.io/writing/fft-gradient-exclusion"
+}`}</code></pre>
   </article>
 </BaseLayout>

@@ -1,5 +1,6 @@
 ---
 const { title = "AI Research", description = "AI research, multimodal reasoning, post-training, and agentic systems." } = Astro.props;
+import "katex/dist/katex.min.css";
 ---
 <!doctype html>
 <html lang="en">
@@ -15,6 +16,8 @@ const { title = "AI Research", description = "AI research, multimodal reasoning,
       <a class="brand" href="/">Shubhojit Mallick</a>
       <nav>
         <a href="/writing">Writing</a>
+        <a href="https://www.linkedin.com/in/shubh0jit" target="_blank" rel="noreferrer">LinkedIn</a>
+        <a href="https://scholar.google.com/citations?user=uLitJtUAAAAJ&hl=en" target="_blank" rel="noreferrer">Google Scholar</a>
       </nav>
     </header>
     <main><slot /></main>
@@ -86,6 +89,14 @@ a { color: var(--accent); }
 .card { border-top: 1px solid var(--line); padding-top: 18px; }
 .card p { color: var(--muted); font-size: 16px; }
 .meta { color: var(--muted); font: 13px/1.5 "DM Sans", sans-serif; margin-bottom: 8px; }
+.math-translation {
+  margin: 22px 0;
+  padding: 18px 20px;
+  border-left: 2px solid var(--accent);
+  color: var(--muted);
+  font-family: "DM Sans", sans-serif;
+  line-height: 1.8;
+}
 .tag {
   display: inline-block; border: 1px solid var(--line); border-radius: 999px;
   padding: 4px 9px; margin: 3px 5px 3px 0; color: var(--muted);

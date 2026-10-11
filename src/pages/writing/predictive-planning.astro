@@ -51,9 +51,12 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Start at <strong>s</strong> and ask
-      how often you expect to reach <strong>s'</strong>. Count likely visits,
-      but give less weight to visits farther in the future.
+      <strong>Translating the math:</strong> Start in state <strong>s</strong>
+      and count how often a future path visits <strong>s'</strong>. The
+      indicator contributes one for a visit and zero otherwise; the expectation
+      averages over possible paths. The discount factor <strong>γ</strong>
+      makes distant visits count less, so <strong>M(s,s')</strong> is a
+      discounted map of likely future occupancy, not one predicted route.
     </p>
 
     <p>
@@ -101,10 +104,14 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Add up the likely future visits,
-      giving more credit to places that are more rewarding. The predicted future
-      and the current goal stay separate, so a new goal can change the value
-      without rebuilding the map.
+      <strong>Translating the math:</strong> <strong>M(s,s')</strong> says how
+      much future occupancy starting at <strong>s</strong> is assigned to each
+      possible state <strong>s'</strong>; <strong>R(s')</strong> says how
+      rewarding that state is. Multiply occupancy by reward and add across
+      states to get <strong>V(s)</strong>. Because the map and rewards are
+      separate, a changed goal can produce a new value estimate without
+      relearning the occupancy map, as long as the policy and world remain
+      suitable.
     </p>
 
     <p>
@@ -189,9 +196,11 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Replay takes what has been learned
-      and imagines a route one step at a time: from here, take this action, then
-      see where it might lead. That puts replay between memory and planning.
+      <strong>Translating the math:</strong> Begin in state <strong>sₜ</strong>,
+      take action <strong>aₜ</strong>, and use the learned model to predict the
+      next state <strong>ŝₜ₊₁</strong>. Then choose another action and continue.
+      The hats mark predictions rather than observed states; replay is a
+      simulated trajectory, not necessarily a memory of what actually happened.
     </p>
 
     <p>
@@ -208,8 +217,11 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Replay memories that are likely to
-      help a decision, especially when they are cheap to simulate.
+      <strong>Translating the math:</strong> This is a proposed ranking rule,
+      not a universal law: prioritize memory <strong>m</strong> when its
+      expected benefit to a decision is high relative to the computation needed
+      to replay it. The proportionality sign means the score should track that
+      ratio; a real system still has to define and measure both quantities.
     </p>
 
     <p>
@@ -272,9 +284,12 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> A state's value is the reward you
-      expect to collect from there onward, with rewards farther in the future
-      counting less.
+      <strong>Translating the math:</strong> Under policy <strong>π</strong>,
+      <strong>V<sup>π</sup>(s)</strong> is the expected sum of future rewards
+      starting at <strong>s</strong>. Each reward <strong>rₜ</strong> is
+      discounted by <strong>γᵗ</strong>, so immediate rewards weigh more than
+      distant ones. The expectation averages across possible outcomes of
+      following the policy.
     </p>
 
     <p>
@@ -389,9 +404,11 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Find a way to act that uses as
-      little computation as possible, while still meeting the minimum quality
-      bar.
+      <strong>Translating the math:</strong> <strong>π</strong> is a policy for
+      acting. Choose one with low expected computation cost, subject to its
+      behavior reaching at least the quality floor <strong>Q<sub>min</sub></strong>.
+      Saving compute does not count as an improvement if it pushes quality
+      below that floor.
     </p>
 
     <Equation
@@ -400,8 +417,11 @@ import Equation from "../../components/Equation.astro";
     />
 
     <p class="math-translation">
-      <strong>Translating the math:</strong> Keep thinking when the improvement
-      you expect from more thought is worth more than the computation it costs.
+      <strong>Translating the math:</strong> Compare the value you expect after
+      more thinking with the value before it, then subtract the thinking cost.
+      If the expected value of computation is positive, the anticipated
+      improvement outweighs the cost; if it is negative, more computation is
+      not worthwhile under this estimate.
     </p>
 
     <p>

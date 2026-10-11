@@ -46,10 +46,12 @@ import Equation from "../../components/Equation.astro";
       label="Training compute is approximately six times the number of parameters times the number of training tokens"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> Training work grows with both the
-      number of model parameters and the number of training tokens. With the
-      model and recipe fixed, twice as many tokens means roughly twice the work
-      under this estimate.
+      <strong>Translating the math:</strong> <strong>N</strong> is the number
+      of parameters and <strong>D</strong> is the number of training tokens.
+      The estimate says their product sets the rough training compute:
+      doubling either one while holding the other fixed roughly doubles the
+      estimate. The factor <strong>6</strong> is a rule of thumb for dense
+      forward and backward computation, not a precise count for every model.
     </p>
     <p>
       Here, <strong>C<sub>train</sub></strong> is training computation in
@@ -81,9 +83,12 @@ import Equation from "../../components/Equation.astro";
       label="Prefill attention work grows in proportion to layers times prompt length squared times hidden width"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> A longer prompt makes prefill
-      attention grow roughly with the square of its length. Double the prompt,
-      and this part of the work can approach four times as much.
+      <strong>Translating the math:</strong> <strong>L</strong> is the number
+      of layers, <strong>P</strong> the prompt length, and <strong>d</strong>
+      the hidden width. Because each prompt token can attend to every other
+      prompt token, attention work grows roughly with <strong>P²</strong>:
+      doubling the prompt can make this component about four times larger.
+      This describes attention work, not total model latency.
     </p>
     <p>
       <strong>L</strong> is the number of transformer layers, <strong>P</strong>
@@ -107,9 +112,13 @@ import Equation from "../../components/Equation.astro";
       label="Decode attention work grows with layers and hidden width times generated tokens multiplied by prompt length plus the triangular sum of earlier generated tokens"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> Every generated token attends to
-      the prompt, and later tokens also attend to earlier generated tokens. A
-      longer prompt and a longer answer both increase this attention work.
+      <strong>Translating the math:</strong> <strong>G</strong> generated
+      tokens each revisit the <strong>P</strong>-token prompt, giving the
+      <strong>GP</strong> term. They also attend to earlier generated tokens:
+      zero for the first token, one for the second, and so on, totaling
+      <strong>G(G−1)/2</strong>. The <strong>Ld</strong> factor accounts for
+      repeating this attention work across layers and hidden dimensions. This
+      is attention work only; it is not a complete decode-time estimate.
     </p>
     <p>
       <strong>G</strong> is the number of generated tokens. The term GP counts
@@ -137,9 +146,13 @@ import Equation from "../../components/Equation.astro";
       label="KV cache memory is approximately two times layers, batch size, context length, KV heads, head dimension, and bytes per value"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> The cache grows with the number of
-      layers, sequences, cached tokens, KV heads, and the size of each stored
-      value. The factor of two is for keys and values.
+      <strong>Translating the math:</strong> For each of <strong>B</strong>
+      sequences, the cache stores a key and a value for every one of
+      <strong>T</strong> tokens, in each of <strong>L</strong> layers. Each
+      uses <strong>n<sub>kv</sub></strong> heads of width
+      <strong>d<sub>h</sub></strong>, with <strong>b</strong> bytes per
+      number. Multiplying these counts gives the approximate memory in bytes;
+      the leading <strong>2</strong> accounts for both keys and values.
     </p>
     <p>
       <strong>M<sub>KV</sub></strong> is cache memory in bytes. The factor two
@@ -226,9 +239,12 @@ import Equation from "../../components/Equation.astro";
       label="Choose a system policy that minimizes expected serving cost while keeping task quality above a minimum target"
     />
     <p class="math-translation">
-      <strong>Translating the math:</strong> Reduce the expected cost of
-      serving a request, but only among choices that meet the minimum quality
-      target.
+      <strong>Translating the math:</strong> <strong>π</strong> is a system
+      policy, such as how much context to retrieve or how long to generate.
+      Choose the policy with the lowest expected serving cost, but only from
+      policies whose quality <strong>Q(π)</strong> meets the floor
+      <strong>Q<sub>min</sub></strong>. The equation makes quality a constraint,
+      not something to trade away silently for lower cost.
     </p>
     <p>
       The policy
