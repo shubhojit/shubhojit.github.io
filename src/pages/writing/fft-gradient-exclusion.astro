@@ -23,11 +23,12 @@ import Equation from "../../components/Equation.astro";
     </p>
 
     <p>
-      The question is where to spend it. In the
-      <a href="https://github.com/shubhojit/adaptive-reflection-refinement" target="_blank" rel="noreferrer">adaptive reflection-refinement prototype</a>,
-      a router scores image tiles using the overlap between the gradients of the
-      estimated transmission and its residual [2]. Tiles with stronger overlap
-      receive priority for refinement.
+      Where should that limited refinement budget go? That's a question I've
+      been wrestling with in my
+      <a href="https://github.com/shubhojit/adaptive-reflection-refinement" target="_blank" rel="noreferrer">adaptive reflection-refinement prototype</a>.
+      Its router scores image tiles by how much the gradients of the estimated
+      transmission overlap with the residual [2], then gives higher-scoring
+      tiles priority for refinement.
     </p>
 
     <p>
@@ -66,11 +67,12 @@ import Equation from "../../components/Equation.astro";
       the two original layers uniquely.
     </p>
     <p>
-      That ambiguity matters. The prototype's gradient-exclusion term is a
-      prior: it favors decompositions in which transmission and residual
-      gradients do not strongly coincide, following a line of work on
-      reflection separation [1]. It is a useful modeling choice, not a physical
-      law that tells us exactly which layer produced each edge.
+      And this is where separating the layers gets tricky. The prototype uses
+      gradient exclusion as a nudge: it favors solutions where the transmission
+      and residual do not place strong gradients on top of each other, building
+      on earlier work in reflection separation [1]. That can be helpful, but it
+      is still a modeling choice. It cannot tell us with certainty which layer
+      really made a particular edge.
     </p>
 
     <h2>What does a gradient actually measure?</h2>
@@ -136,28 +138,27 @@ import Equation from "../../components/Equation.astro";
       a direct measure of whether the recovered layers are physically correct.
     </p>
     <p>
-      Here is where the apparently straightforward Fourier interpretation becomes
-      interesting. The gradient operator is linear. The exclusion loss built from
-      its outputs is not. The prototype first computes a local alignment at each
-      pixel, then squares that quantity before aggregating it. The order of
-      operations matters: squaring a local quantity is not equivalent to
-      comparing the global frequency energies of the two images.
+      This is where I had to slow down. Taking a gradient is a linear operation,
+      but the full exclusion loss is not: the prototype finds the local alignment
+      at each pixel, squares it, and only then adds everything up. That order
+      changes what the loss means. It is not the same as comparing the images'
+      overall energy at each frequency.
     </p>
     <p>
-      The FFT gives a clean spectral interpretation of the gradient operator. It
-      does not license replacing the complete loss with a frequency-by-frequency
-      comparison. Multiplication in image space becomes convolution in frequency
-      space, so pointwise products mix frequency components. The loss is therefore
-      not just a per-frequency comparison between transmission and reflection.
+      The FFT still helps us understand what the gradient operator responds to.
+      But it does not turn the whole loss into a simple frequency-by-frequency
+      comparison. Those local gradient products mix frequency components when
+      viewed in frequency space, so we cannot just compare the transmission and
+      reflection spectra one band at a time and call that the same objective.
     </p>
 
     <h2>Knowing the frequencies isn't the same as knowing where to refine</h2>
     <p>
       The current router scores each tile using the mean absolute spatial
-      gradient overlap in the initial estimate and residual. That has a direct
-      local interpretation: these are the places where the current estimate
-      exhibits the pattern that the refinement prior penalizes. The router then
-      spends its finite update budget on the highest-scoring tiles.
+      gradient overlap in the initial estimate and residual. That's a fairly
+      tangible signal: it points to places where the current estimate has the
+      pattern the refinement prior is trying to reduce. The router then spends
+      its limited update budget on the tiles with the strongest scores.
     </p>
     <p>
       A whole-image FFT answers a different question. It describes how much
@@ -207,43 +208,44 @@ import Equation from "../../components/Equation.astro";
       at deployment when the clean image is unknown.
     </p>
     <p>
-      Evaluate the same synthetic scenes and budgets, report reconstruction quality
-      against the known clean layer, and include both refinement time and end-to-end
-      time with routing overhead. A ranking metric such as Spearman correlation
-      between candidate scores and measured <strong>Δ<sub>i</sub></strong> values
-      can be informative. The key question is whether the FFT-based strategy
-      predicts useful refinement better than the existing score, and whether the
-      improvement justifies the extra computation.
+      We can compare the methods on the same synthetic scenes, with the same
+      update budget, and check the result against the known clean layer. We'd
+      also time both the refinement itself and the full pipeline, including
+      routing. Spearman correlation between a router's score and the measured
+      <strong>Δ<sub>i</sub></strong> can tell us whether its rankings are useful.
+      What I'd want to find out is simple: does the FFT help us choose better
+      tiles, and is that improvement worth the extra work?
     </p>
 
-    <h2>What the Fourier view actually buys us</h2>
+    <h2>So, what did the Fourier view help us see?</h2>
     <p>
-      The FFT does not reveal a frequency-domain router hiding inside the
-      existing prototype. What it reveals is a more precise interpretation of
-      the gradient-exclusion prior. Finite differences weight spatial variation
-      according to frequency, while the pointwise exclusion loss couples these
-      variations through local products. The resulting objective is more
-      complicated than a simple comparison of transmission and residual energy at
-      each frequency.
+      I started out wondering whether the FFT might point us toward a new way
+      to route tiles. It hasn't handed us a ready-made router. What it has done
+      is help me see the existing gradient-exclusion prior more clearly: finite
+      differences respond differently at different spatial frequencies, while
+      the local products in the loss mix those responses together. So the
+      objective is richer than comparing transmission and residual energy one
+      frequency at a time.
     </p>
     <p>
-      That distinction matters because the router is not trying to characterize
-      an image for its own sake. It is trying to decide where a limited amount of
-      computation will be most useful. A global spectrum can tell us which scales
-      are present. Local spectral features may tell us more about where those
-      scales occur. But neither automatically tells us which refinement update
-      will improve the reconstruction.
+      And that's the part I keep coming back to. The router doesn't need a
+      beautiful description of the image; it needs to pick the places where an
+      update will actually help. A whole-image spectrum tells us which scales
+      are present, and local features might tell us where they show up. But
+      neither one tells us, on its own, which update will improve the result.
     </p>
     <p>
-      That last question is empirical. The next step is not to replace the
-      spatial router with an FFT. It is to test whether local frequency
-      information predicts refinement benefit better than the existing score and
-      whether the gain is worth its computational cost.
+      So I wouldn't swap out the spatial router for an FFT just yet. I'd try a
+      small comparison first: give both routers the same candidate tiles and
+      budget, then see whether local frequency features do a better job of
+      picking useful updates—and whether they do it cheaply enough to be worth
+      keeping.
     </p>
     <p>
-      <strong>The interesting connection is not that gradients have a Fourier
-      representation. It is that understanding the representation may help us ask a
-      better question about where computation should go.</strong>
+      <strong>For me, the useful part of this Fourier detour is that it gives us
+      a sharper experiment to run: can knowing a tile's local frequencies help
+      us spend a limited refinement budget where it actually makes a
+      difference?</strong>
     </p>
 
     <h2>References</h2>
