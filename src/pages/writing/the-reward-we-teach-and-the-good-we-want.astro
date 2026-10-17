@@ -1,0 +1,177 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import katex from "katex";
+import { createMarkdownProcessor } from "@astrojs/markdown-remark";
+import essayMarkdown from "../../content/writing/reward-overoptimization.md?raw";
+
+const translationOverrides: Record<number, string> = {
+  2: "ϕ denotes the learned reward model's parameters; rϕ is the score that model assigns to a prompt-response pair.",
+  4: "θ denotes the policy's parameters, which determine its probability distribution over responses to each prompt.",
+  7: "The proxy objective equals true expected quality plus the reward-model error averaged over the current policy.",
+  8: "The gap between proxy and true performance is the reward-model error averaged over responses the current policy produces.",
+  16: "The selected candidate's true quality is zero; its estimated quality is the largest error among the candidates.",
+  17: "The selection rule chooses the candidate with the largest error, so its estimate is the maximum error in the set.",
+  18: "Although every individual error has mean zero, choosing the largest one makes its expected value positive.",
+  19: "With more than one independent, non-degenerate estimate, the maximum error has a positive expectation.",
+  20: "For many independent Gaussian errors, the expected maximum grows approximately with the error scale times the square root of twice the log of the number of candidates.",
+  24: "This objective trades expected proxy reward against the KL cost of moving from the reference policy; the probabilities must also sum to one.",
+  26: "We differentiate with respect to the probability assigned to response y; the next equation gives the first-order condition.",
+  27: "At an interior optimum, changing any response probability cannot improve the objective, so this derivative must be zero.",
+  28: "At an interior optimum, the derivative is zero; rearranging isolates the log ratio between the new and reference probabilities.",
+  29: "Exponentiation converts the log probability ratio into a ratio of probabilities.",
+  31: "The optimal policy reweights each reference probability by an exponential reward factor, then normalizes the result.",
+  32: "This is an exponential tilt: the reference policy supplies the starting probabilities, and the learned reward reweights them.",
+  33: "Taking the ratio between two responses cancels the shared normalizer, leaving their reference odds and reward difference.",
+  36: "The policy's expected proxy reward is the probability-weighted average of the two proxy scores.",
+  37: "Under the true rewards, increasing the probability of H lowers expected quality.",
+  39: "For Bernoulli policies, the KL penalty compares the probability p of choosing H with the reference probability q.",
+  40: "Differentiating the Bernoulli KL-regularized objective and setting the result to zero gives the condition used in the next step.",
+  41: "Setting the derivative to zero gives a relationship between the policy's log-odds and the reference policy's log-odds.",
+  42: "The log-odds of choosing H equal the reference log-odds plus the proxy reward advantage scaled by β.",
+  43: "The sigmoid converts a log-odds value into a probability between zero and one.",
+  45: "This is the proxy reward expected under the policy at optimization step t.",
+  48: "M_t is the best true-performance value observed up to step t; the next expression compares current performance with that running maximum.",
+  51: "Each ensemble member assigns a reward score to the same response.",
+  52: "The ensemble's disagreement is measured by the variance of its reward predictions around their mean.",
+  53: "Averaging response-level disagreement under the current policy gives a policy-level uncertainty signal.",
+  55: "α chooses the quantile being measured; a high value such as 0.95 focuses on the upper tail of predicted rewards.",
+  57: "Each candidate response is represented by a d-dimensional feature vector.",
+  58: "Both the true reward and the learned proxy are functions of the same response features.",
+  60: "The proxy reward equals the true reward plus an error term.",
+  61: "The error is split into ordinary noise, systematic bias, and occasional unusually large positive errors.",
+  63: "This is expected proxy reward under the policy defined by β.",
+  64: "This is expected true quality under the same policy; comparing it with proxy reward shows whether the two objectives are moving together.",
+  65: "Proxy performance equals true performance plus the policy-dependent average reward-model error; optimization can change all three terms.",
+};
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function renderInlineMath(value: string) {
+  const inlineMath = /\\\(([\s\S]*?)\\\)/g;
+  let result = "";
+  let cursor = 0;
+
+  for (const match of value.matchAll(inlineMath)) {
+    const start = match.index ?? 0;
+    const expression = match[1];
+    result += escapeHtml(value.slice(cursor, start));
+    result += katex.renderToString(expression, {
+      displayMode: false,
+      output: "htmlAndMathml",
+      throwOnError: true,
+    });
+    cursor = start + match[0].length;
+  }
+
+  return result + escapeHtml(value.slice(cursor));
+}
+
+function renderInlineMathInMarkdown(value: string) {
+  return value.replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression: string) =>
+    katex.renderToString(expression, {
+      displayMode: false,
+      output: "htmlAndMathml",
+      throwOnError: true,
+    }),
+  );
+}
+
+function renderDisplayMath(expression: string, label: string) {
+  const rendered = katex.renderToString(expression.trim(), {
+    displayMode: true,
+    output: "htmlAndMathml",
+    throwOnError: true,
+  });
+
+  const accessibleLabel = label.replace(/\\\(([\s\S]*?)\\\)/g, "$1");
+  return `<div class="equation" role="figure" aria-label="${escapeHtml(accessibleLabel)}"><div class="equation-inner">${rendered}</div></div>`;
+}
+
+function nextParagraph(source: string) {
+  const leadingWhitespace = source.match(/^\s*/)?.[0] ?? "";
+  const remainder = source.slice(leadingWhitespace.length);
+  if (!remainder || remainder.startsWith("\\[") || /^#{1,6}\s/.test(remainder)) {
+    return { leadingWhitespace, paragraph: "", paragraphLength: 0 };
+  }
+
+  const boundaries = [
+    remainder.search(/\n\s*\n/),
+    remainder.search(/\\\[/),
+    remainder.search(/^#{1,6}\s/m),
+    remainder.search(/^---\s*$/m),
+  ].filter((boundary) => boundary >= 0);
+  const paragraphLength = boundaries.length ? Math.min(...boundaries) : remainder.length;
+
+  return {
+    leadingWhitespace,
+    paragraph: remainder.slice(0, paragraphLength).trim(),
+    paragraphLength,
+  };
+}
+
+function firstTwoSentences(value: string) {
+  const boundaries = [...value.matchAll(/[.!?](?=\s|$)/g)];
+  if (boundaries.length < 2) {
+    return {
+      text: value.trim(),
+      length: value.length,
+    };
+  }
+
+  const end = boundaries[1].index! + 1;
+  return {
+    text: value.slice(0, end).trim(),
+    length: end,
+  };
+}
+
+let markdownWithMath = "";
+let cursor = 0;
+let equationNumber = 0;
+
+for (const match of essayMarkdown.matchAll(/\\\[([\s\S]*?)\\\]/g)) {
+  const start = match.index ?? 0;
+  const end = start + match[0].length;
+  const expression = match[1];
+  const { leadingWhitespace, paragraph, paragraphLength } = nextParagraph(essayMarkdown.slice(end));
+  const override = translationOverrides[equationNumber + 1];
+  const transitionOnly = /^(and|therefore|then|rearranging|exponentiating|taking logarithms|using|we obtain)\b/i.test(paragraph);
+  const hasExplanation = paragraph.length > 0 && !paragraph.startsWith("\\[");
+  const automaticTranslation = hasExplanation ? firstTwoSentences(paragraph) : undefined;
+  const translation = override ?? (transitionOnly ? "" : automaticTranslation?.text) ??
+    "This expression defines a quantity used in the argument that follows.";
+  const consumeParagraph = hasExplanation && (override !== undefined || transitionOnly || automaticTranslation !== undefined);
+  const consumedLength = consumeParagraph
+    ? leadingWhitespace.length + (override !== undefined || transitionOnly
+      ? paragraphLength
+      : (automaticTranslation?.length ?? 0))
+    : 0;
+
+  markdownWithMath += renderInlineMathInMarkdown(essayMarkdown.slice(cursor, start));
+  markdownWithMath += `\n\n${renderDisplayMath(expression, translation)}\n\n`;
+  markdownWithMath += `<p class="math-translation"><strong>Translating the math:</strong> ${renderInlineMath(translation)}</p>\n\n`;
+  cursor = end + consumedLength;
+  equationNumber += 1;
+}
+
+markdownWithMath += renderInlineMathInMarkdown(essayMarkdown.slice(cursor));
+
+const markdownProcessor = await createMarkdownProcessor();
+const { code: contentHtml } = await markdownProcessor.render(markdownWithMath);
+---
+
+<BaseLayout
+  title="The Reward We Teach, and the Good We Want: AI Research"
+  description="A research essay on reward hacking, reward models, optimization, and whether the onset of reward overoptimization can be predicted."
+>
+  <article>
+    <div class="meta">Essay · Alignment · Reward modeling</div>
+    <div set:html={contentHtml} />
+  </article>
+</BaseLayout>
