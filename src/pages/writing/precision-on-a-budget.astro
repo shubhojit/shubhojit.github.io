@@ -1,110 +1,258 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import Equation from "../../components/Equation.astro";
 ---
 <BaseLayout
-  title="CADO: Precision on a Budget — Shubhojit"
-  description="A research hypothesis on using activation statistics to allocate limited high-precision, on-chip memory and improve inference quality–latency tradeoffs."
+  title="Cache-Aware Dynamic Outlier Offloading (CADO): Precision on a Budget — Shubhojit"
+  description="A reflective, mathematically grounded research hypothesis on allocating precision and fast memory dynamically during inference."
 >
   <article>
     <div class="meta">AI Systems · Quantization · Inference</div>
-    <h1>CADO: Precision on a Budget</h1>
+    <h1>Cache-Aware Dynamic Outlier Offloading (CADO): Precision on a Budget</h1>
     <p class="lede">
-      Can activation statistics help a model decide where scarce high-precision,
-      on-chip memory is most valuable?
+      A model does not need every number to be equally precise. But can it know
+      which numbers deserve the extra care, and can the hardware afford it?
+      Explore the <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading" target="_blank" rel="noreferrer">CADO repository on GitHub</a>.
     </p>
 
     <p>
-      Quantization changes more than the number of bits used to represent a
-      weight. It changes which values move through the system, where temporary
-      data lives, and how much work fits close to the compute units. That makes
-      precision allocation a systems question as much as a numerical one.
+      There is a small, recurring bargain inside neural-network inference. We
+      would like every computation to be accurate, and every computation to be
+      fast. In practice, these wishes compete for the same finite resources:
+      bits, bandwidth, cache capacity, and time. We compress representations so
+      that more work can fit close to the processor. Then we spend some of the
+      savings recovering accuracy where compression hurts.
     </p>
 
     <p>
-      The idea here is a hypothesis, not a result: use information about the
-      current activations to decide which parts of a computation deserve a
-      higher-precision path, while keeping the fast-memory working set within a
-      fixed budget.
+      The difficult part is deciding where that care should go. A large number
+      looks important, but magnitude is not the same as influence. A value can
+      be numerically unusual and still have little effect on the final answer;
+      a small value can matter a great deal after it passes through the rest of
+      the network. And even a good numerical decision can become a poor systems
+      decision if it requires expensive data movement.
+    </p>
+
+    <p>
+      Cache-Aware Dynamic Outlier Offloading (CADO) starts with that tension.
+      The hypothesis is that activation information can help allocate a limited
+      high-precision budget more intelligently than a fixed policy. The aim is
+      not to preserve every value. It is to ask which values are worth
+      preserving under a real resource constraint.
+    </p>
+
+    <p class="quiet-note">
+      This is a research question, not a performance claim. The prototype below
+      is a starting point for making the question concrete; it does not yet
+      establish a cache-aware speedup.
+    </p>
+
+    <h2>The problem is not just fewer bits</h2>
+    <p>
+      Quantization is often introduced as a change of representation: replace
+      floating-point values with a smaller set of integers, and recover an
+      approximation when needed. That description is correct, but incomplete
+      for systems work. A representation also determines how data is packed,
+      how much can remain close to the compute units, which kernels can be
+      used, and how much overhead is paid to move between representations.
+    </p>
+
+    <p>
+      Imagine a limited shelf beside a workbench. The shelf is fast to reach,
+      but it is small. You cannot put every tool on it, so you keep the tools
+      you expect to need most. The analogy becomes less comfortable when the
+      tools change with every job: yesterday's best selection may be wrong for
+      today's task. Dynamic precision routing asks whether a computation can
+      make a similar choice about its values, without spending more time
+      choosing than it saves by choosing well.
+    </p>
+
+    <h2>The mathematical motivation: precision has a price</h2>
+    <p>
+      Consider one linear layer. Let <strong>X</strong> be its activation
+      matrix and <strong>W</strong> its weight matrix:
+    </p>
+    <Equation
+      expression={String.raw`Y = XW`}
+      label="The output Y of a linear layer is the product of its activation matrix X and weight matrix W."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Each row of <strong>X</strong>
+      represents an input activation vector, and <strong>W</strong> maps those
+      vectors into the layer's output space. Matrix multiplication combines
+      them to produce <strong>Y</strong>. This is the computation whose result
+      will change when we represent its inputs with less precision.
+    </p>
+
+    <p>
+      If we quantize both matrices, we no longer compute exactly the same
+      product. Write their quantized versions as <strong>X + ΔX</strong> and
+      <strong>W + ΔW</strong>, where the delta terms represent quantization
+      error. The resulting output difference is:
+    </p>
+    <Equation
+      expression={String.raw`\begin{aligned}\hat{Y} &= (X + \Delta X)(W + \Delta W) \\ \hat{Y} - Y &= \Delta X W + X \Delta W + \Delta X \Delta W\end{aligned}`}
+      label="Expanding the quantized matrix product shows activation error, weight error, and an interaction term."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>ΔX</strong> and
+      <strong>ΔW</strong> are the changes introduced by quantizing activations
+      and weights. The output error has three parts: activation error carried
+      through the weights, weight error applied to the activations, and an
+      interaction between both errors. So the impact of a quantized value
+      depends on the computation around it, not just on its own error.
+    </p>
+    <p>
+      In a deep network, these effects continue through later layers. That is
+      why “keep the largest values” is a plausible starting rule, but not a
+      complete theory of importance. Magnitude gives us a cheap signal. It
+      does not directly tell us how much a perturbation changes the output,
+      the loss, or the task decision. A more principled allocator would ideally
+      estimate the cost of lowering precision, not just the size of the value.
+    </p>
+
+    <p>
+      For a small perturbation to the output, a first-order approximation
+      gives a related intuition. If the task loss is <strong>ℒ</strong> and
+      the output changes by <strong>δY</strong>, then:
+    </p>
+    <Equation
+      expression={String.raw`\delta \mathcal{L} \approx \left\langle \nabla_Y \mathcal{L}, \delta Y \right\rangle`}
+      label="For a small output perturbation, the first-order change in task loss is approximately the inner product of the loss gradient and the output change."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>∇<sub>Y</sub>ℒ</strong>
+      describes how the loss changes with the output, and <strong>δY</strong>
+      is the perturbation caused by reduced precision. Their inner product
+      estimates the loss change when that perturbation is small enough for a
+      local, first-order approximation to be useful. A large numerical error
+      can be harmless in an insensitive direction; a smaller one can be costly
+      if it pushes the output toward a bad decision.
+    </p>
+    <p>
+      This does not mean we can cheaply calculate the exact importance of
+      every value at inference time. It means magnitude should be treated as a
+      proxy to test, rather than as importance itself.
+    </p>
+
+    <p>
+      Now add the systems constraint. Let <strong>z<sub>i</sub> = 1</strong>
+      mean computation unit <em>i</em> gets the higher-precision path, and
+      <strong>z<sub>i</sub> = 0</strong> mean it stays on the lower-precision
+      path. Let <strong>T(z)</strong> be computation latency,
+      <strong>T<sub>route</sub>(z)</strong> the time spent selecting, packing,
+      and dispatching units, <strong>M(z)</strong> the fast-memory working
+      set, and <strong>E(z)</strong> the expected task-quality loss. A
+      simplified allocation problem is:
+    </p>
+    <Equation
+      expression={String.raw`\begin{aligned}\min_{z} \quad & T(z) + T_{\mathrm{route}}(z) \\ \text{subject to} \quad & M(z) \le C \\ & E(z) \le \varepsilon \\ & z_i \in \{0,1\}\end{aligned}`}
+      label="Choose binary precision allocations to minimize computation and routing latency while respecting fast-memory capacity and a maximum quality loss."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Choose which units receive extra
+      precision so that total latency, including routing, is low. The
+      fast-memory working set must stay within capacity <strong>C</strong>,
+      and expected quality loss must stay below tolerance
+      <strong>ε</strong>. The binary variable <strong>z<sub>i</sub></strong>
+      records the precision choice for each unit. The routing process has a
+      cost; it cannot be treated as free.
+    </p>
+    <p>
+      In an idealized version, each unit would have a known benefit, memory
+      cost, and time cost. In a real model, those quantities interact: cache
+      behavior is not perfectly additive, kernels have preferred shapes, and
+      one routing decision can change the efficiency of another. The equation
+      is a map of the problem, not a claim that the problem has already been
+      solved.
+    </p>
+
+    <p>
+      The question becomes more interesting here. We are not only asking how
+      to reduce numerical error. We are asking how to spend a scarce resource
+      on the errors that matter, while accounting for the cost of discovering
+      them.
     </p>
 
     <h2>The hypothesis</h2>
     <p>
       Under a fixed on-chip memory budget, activation-aware precision routing
-      can achieve a better quality–latency tradeoff than a static outlier
-      policy. In this framing, L1 cache is one possible budget; other hardware
-      may expose a different fast-memory tier or capacity.
+      may achieve a better quality–latency tradeoff than a static outlier
+      policy. In this framing, the level-one (L1) cache is one possible budget; other
+      hardware may expose a different fast-memory tier or capacity.
     </p>
-
-    <div class="constraint" role="math" aria-label="Minimize end-to-end latency subject to task quality meeting a minimum target and the fast-memory working set staying within capacity C">
-      <strong>minimize</strong> end-to-end latency<br />
-      <strong>subject to</strong> task quality ≥ Q<sub>min</sub><br />
-      fast-memory working set ≤ C
-    </div>
-
-    <p class="math-translation">
-      <strong>Translating the math:</strong> Choose a routing policy that makes
-      the full request as fast as possible. It is only acceptable if task
-      quality stays at or above <strong>Q<sub>min</sub></strong> and the
-      fast-memory working set stays within capacity <strong>C</strong>. A
-      faster policy that violates either limit is not a solution.
-    </p>
-
     <p>
-      The central question is whether the activation distribution can guide
-      the allocation of scarce high-precision and on-chip memory resources
-      better than a fixed rule can.
+      Let <strong>π</strong> denote a routing policy,
+      <strong>T(π)</strong> its end-to-end latency,
+      <strong>Q(π)</strong> its task quality, and <strong>M(π)</strong> its
+      fast-memory working set. The research goal can be written as:
+    </p>
+    <Equation
+      expression={String.raw`\begin{aligned}\min_{\pi} \quad & T(\pi) \\ \text{subject to} \quad & Q(\pi) \ge Q_{\min} \\ & M(\pi) \le C\end{aligned}`}
+      label="Find a routing policy with minimum end-to-end latency while meeting minimum task quality and fast-memory capacity constraints."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Among policies that meet the
+      minimum acceptable task quality <strong>Q<sub>min</sub></strong> and
+      fit within fast-memory capacity <strong>C</strong>, choose the one with
+      the lowest end-to-end latency. A policy that is faster but misses either
+      constraint does not count as a solution.
+    </p>
+    <p>
+      The central question is whether information about the current activation
+      distribution can guide the allocation of scarce precision and fast-memory
+      resources better than a fixed rule can.
     </p>
 
     <h2>What would be routed?</h2>
     <p>
       A layer could divide its computation into units such as channels or
       blocks. An allocator would estimate which units are most sensitive to
-      reduced precision for the current input, then spend a limited high-
-      precision budget on those units. The rest would use a lower-precision
-      path. The exact signal and granularity are open design choices: activation
-      magnitude is easy to measure, but magnitude alone need not predict
-      quantization error or downstream task quality.
+      reduced precision for the current input, then spend a limited
+      high-precision budget on those units. The rest would use a lower-precision
+      path.
     </p>
-
     <p>
-      “Activation-aware” also needs a precise meaning. Routing could adapt for
+      The exact signal and granularity remain open design choices. Activation
+      magnitude is easy to measure, but magnitude alone need not predict
+      quantization error or downstream task quality. Routing could adapt for
       every input, operate at batch or block granularity, or use statistics
       gathered during calibration. These choices trade responsiveness against
       the cost of measuring, packing, and dispatching the selected values.
     </p>
 
-    <h2>A toy prototype: CADO</h2>
+    <h2>A toy prototype</h2>
     <p>
       One concrete starting point is to flag activation columns whose maximum
-      magnitude across a batch exceeds a threshold. Let <strong>X</strong> be an
-      activation matrix, and let <strong>M</strong> be the mask selecting the
-      outlier columns. Then a compact approximation looks like this:
+      magnitude across a batch exceeds a threshold. Let <strong>X</strong> be
+      an activation matrix and let <strong>M</strong> be a mask selecting the
+      outlier columns. A compact approximation is:
     </p>
-
-    <div class="constraint" role="math" aria-label="Approximate matrix product as exact high-precision outlier terms plus quantized low-precision terms">
-      Y ≈ X<sub>out</sub>W<sub>out</sub> + Q(X<sub>normal</sub>)Q(W<sub>normal</sub>)
-    </div>
-
+    <Equation
+      expression={String.raw`Y \approx X_{\mathrm{out}}W_{\mathrm{out}} + Q(X_{\mathrm{normal}})Q(W_{\mathrm{normal}})`}
+      label="Approximate the matrix product with a higher-precision contribution from selected outlier columns and a quantized contribution from the remaining columns."
+    />
     <p class="math-translation">
-      <strong>Translating the math:</strong> Split the inner dimensions of the
-      activation matrix <strong>X</strong> and weight matrix <strong>W</strong>
-      into selected outlier columns and the remaining normal columns. Multiply
-      the outlier subset in higher precision; quantize the normal subset with
-      <strong>Q</strong> and multiply that more cheaply. The two contributions
-      are added to approximate <strong>Y</strong>. The approximation sign
-      matters: quantization introduces error, and identifying outliers does
-      not by itself guarantee that those values are the most important ones.
+      <strong>Translating the math:</strong> Split the matching inner
+      dimensions of activation matrix <strong>X</strong> and weight matrix
+      <strong>W</strong> into selected outlier columns and the remaining
+      columns. Multiply the outlier subset in higher precision; quantize the
+      normal subset with <strong>Q</strong> and multiply it in lower precision.
+      Add the contributions to approximate <strong>Y</strong>. The
+      approximation sign matters: quantization introduces error, and
+      identifying outliers does not guarantee that those values are the most
+      important ones.
     </p>
-
     <p>
-      In other words, the system is trying to solve a routing problem: choose a
-      small subset of values to preserve exactly, and let the rest live in a
-      cheaper representation. That is the heart of the hypothesis.
+      In this first sketch, the routing signal is deliberately simple: a
+      column is selected if any activation in the batch crosses a threshold.
+      It makes the decomposition tangible, but it is not evidence that the
+      threshold identifies the right values or that the resulting computation
+      is faster.
     </p>
-
     <p>
-      This is the idea behind the public prototype repository:
-      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/tree/master" target="_blank" rel="noreferrer">CADO on GitHub</a>.
+      The public prototype is available in the
+      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/tree/master" target="_blank" rel="noreferrer">CADO repository</a>.
     </p>
 
     <pre><code>{`import numpy as np
@@ -129,12 +277,11 @@ def cado_matrix_multiply(x, weights, threshold=6.0):
     if x.shape[0] == 0 or x.shape[1] == 0 or weights.shape[1] == 0:
         raise ValueError("Matrices must have non-empty dimensions")
 
-    # Step 1: identify the outlier columns for this batch.
-    # A column is treated as an outlier if any element in that column is large.
+    # Step 1: identify outlier columns for this batch.
     outlier_mask = np.max(np.abs(x), axis=0) >= threshold
     result = np.zeros((x.shape[0], weights.shape[1]), dtype=np.float32)
 
-    # Step 2: keep the high-impact subset in a dense, higher-precision path.
+    # Step 2: keep the selected subset in a dense, higher-precision path.
     if np.any(outlier_mask):
         result += x[:, outlier_mask] @ weights[outlier_mask, :]
 
@@ -144,14 +291,12 @@ def cado_matrix_multiply(x, weights, threshold=6.0):
         x_normal = x[:, normal_mask]
         w_normal = weights[normal_mask, :]
 
-        # Scale each matrix so values fit cleanly into signed int8.
         scale_x = max(float(np.max(np.abs(x_normal))) / 127.0, 1e-12)
         scale_w = max(float(np.max(np.abs(w_normal))) / 127.0, 1e-12)
 
         x_int8 = np.clip(np.round(x_normal / scale_x), -127, 127).astype(np.int8)
         w_int8 = np.clip(np.round(w_normal / scale_w), -127, 127).astype(np.int8)
 
-        # Reconstruct the low-precision contribution and add it back.
         result += (x_int8.astype(np.int32) @ w_int8.astype(np.int32)) * (scale_x * scale_w)
 
     return result`}</code></pre>
@@ -160,77 +305,162 @@ def cado_matrix_multiply(x, weights, threshold=6.0):
       This is a correctness-oriented sketch, not a cache-aware implementation
       or a performance result. The threshold is shared across the batch, the
       high-precision subset is selected by activation magnitude rather than
-      measured sensitivity, and the code does not constrain its working set to
-      a capacity C. It also omits kernel-launch, packing, and hardware effects.
-      Those are exactly the choices and costs an experiment would need to
-      define and measure.
+      measured sensitivity, and the code does not constrain its working set
+      to capacity <strong>C</strong>. It also omits kernel-launch, packing,
+      and hardware effects. Those are not incidental details. They are part
+      of the question CADO is trying to answer.
     </p>
 
-    <h2>How to test it</h2>
+    <h2>What the prototype has shown so far</h2>
     <p>
-      Compare dynamic allocation with uniform low-precision execution and a
-      clearly specified static outlier baseline. Hold the model, task data, and
-      total fast-memory budget constant. Sweep that budget and measure the
-      quality–latency frontier, rather than reporting a single point chosen
-      after the fact.
+      I began with a question small enough to fit inside a matrix. If a few
+      activation columns contain unusually large values, what happens if I
+      spare them the rounding that the rest must endure? Would preserving
+      those columns in higher precision bring the result closer to the one
+      computed entirely in FP32?
+    </p>
+    <p>
+      In one synthetic experiment, it did. Against the FP32 reference, the
+      CADO-style decomposition produced a relative error of about
+      <strong>0.0031</strong>, compared with <strong>0.0376</strong> for uniform
+      INT8 quantization. The
+      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/blob/master/experiments/03_baseline_comparison.py" target="_blank" rel="noreferrer">experiment script</a>
+      and its
+      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/blob/master/results/baseline_comparison.csv" target="_blank" rel="noreferrer">recorded results</a>
+      are available in the repository.
+    </p>
+    <p>
+      There is something satisfying about this first result. A small part of
+      the computation receives different treatment, and the numerical error
+      falls. In a workload constructed with outliers, the intuition seems to
+      hold: perhaps precision need not be distributed evenly to be useful.
+      Perhaps some values deserve more of it than others.
+    </p>
+    <p>
+      But the experiment answers only the question I put to it. The data was
+      synthetic, and relative error measures numerical closeness, not the
+      quality of an answer produced by a real model. I have not yet shown that
+      the same allocation improves task performance, or that identifying and
+      separating the outliers takes less time than it saves. Nor does a smaller
+      high-precision subset, by itself, tell me what happens inside the cache.
+    </p>
+    <p>
+      The
+      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/blob/master/experiments/05_equal_budget_comparison.py" target="_blank" rel="noreferrer">equal-budget experiment</a>
+      and
+      <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/blob/master/experiments/06_cache_tile_sweep.py" target="_blank" rel="noreferrer">tile sweep</a>
+      are attempts to move a little closer to those questions. They compare
+      dynamic and static allocation while limiting the number of columns
+      allowed the higher-precision path. Yet a tile size is still only a
+      stand-in for memory pressure. It tells me how I have arranged the
+      experiment, not how the processor experiences it.
+    </p>
+    <p>
+      A policy can look economical in a matrix and become expensive in a
+      kernel. The work of finding the outliers, packing the selected values,
+      dispatching the computation, and bringing the results back together may
+      consume the very time the policy was meant to save. The hardware has its
+      own account of the computation, and I have not yet seen the full ledger.
+    </p>
+    <p>
+      The next experiment, then, needs to leave the comfort of the synthetic
+      setup. It should measure the complete cost of routing on real hardware:
+      end-to-end latency, packing and dispatch overhead, working-set size, and
+      cache counters, all under a controlled memory budget.
+    </p>
+    <p>
+      For now, I want to keep the claim modest. The prototype has shown that,
+      under these controlled conditions, <strong>where precision is allocated
+      can affect numerical error</strong>. Whether that difference survives
+      contact with a real model, a real cache, and the costs of execution
+      remains an open question.
+    </p>
+    <p>
+      I find that uncertainty useful. It marks the boundary between what the
+      experiment has made visible and what I still need to understand.
     </p>
 
-    <p>At minimum, report:</p>
-    <ul>
-      <li>Task quality at each memory budget.</li>
-      <li>End-to-end latency, including detection, packing, dispatch, and result fusion.</li>
-      <li>Working-set size and hardware counters relevant to cache or on-chip-memory behavior.</li>
-      <li>Results across input lengths and batch sizes, not only one favorable workload.</li>
-    </ul>
-
+    <h2>What I still can’t see</h2>
     <p>
-      The comparison should include the overhead of routing. A policy that
-      saves cache capacity but adds irregular gathers, extra launches, or
-      synchronization may lose on latency. Likewise, fitting a nominal working
-      set under C does not guarantee that it will avoid conflict misses or
-      achieve better bandwidth on a real processor.
+      The first results make it tempting to believe the intuition: some values
+      seem to benefit from more precision than others. But each result so far
+      has come from a world I made deliberately simple, where the outliers are
+      easy to plant and the computation fits neatly on a page.
     </p>
-
-    <h2>What could make the idea fail?</h2>
     <p>
-      The activation signal may not identify the values that matter most to
-      output quality. Routing overhead may erase the savings. Dynamic sparsity
-      may interfere with vectorized kernels, or the selected high-precision
-      subset may change too quickly to reuse data effectively. Any of these
-      outcomes would be useful: they would show where static quantization or a
-      simpler allocation rule is the better systems choice.
+      I keep returning to the distance between a mask that lowers numerical
+      error and a computation that runs better. Magnitude gives me a convenient
+      way to choose columns. I don’t yet know whether it finds the values that
+      matter most, or simply the ones that are easiest to notice. And the act
+      of choosing has a cost of its own: values must be found, gathered,
+      packed, and eventually brought back together.
+    </p>
+    <p>
+      The cache is harder to reason about from a spreadsheet. A working set may
+      fit within a budget and still behave poorly once the processor encounters
+      its shape, its tiles, and the rest of the workload. I haven’t yet measured
+      that full encounter.
+    </p>
+    <p>
+      So I don’t know where the idea stops helping. Perhaps the signal will be
+      too weak, or the routing too costly. Perhaps a simpler static choice will
+      turn out to be kinder to the hardware. These possibilities don’t make the
+      question feel smaller to me. They remind me what the next experiment has
+      to earn.
     </p>
 
     <h2>Scope and prior work</h2>
     <p>
-      This is not a claim that mixed-precision outlier handling is new.
-      <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noreferrer">LLM.int8()</a>
-      uses a mixed-precision decomposition for outlier features, while
-      <a href="https://arxiv.org/abs/2211.10438" target="_blank" rel="noreferrer">SmoothQuant</a>
+      Mixed-precision outlier handling is not new. The
+      <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noreferrer">“8-bit Matrix Multiplication for Transformers at Scale” method, known as LLM.int8() (LLM means large language model)</a>
+      isolates outlier features for higher-precision computation.
+      <a href="https://arxiv.org/abs/2211.10438" target="_blank" rel="noreferrer">SmoothQuant, “Accurate and Efficient 8-bit Quantization for Large Language Models”</a>
       uses activation statistics to shift quantization difficulty between
-      activations and weights. The question here is narrower and should be
-      tested against relevant existing methods: can the allocation policy be
-      explicitly optimized for a constrained fast-memory budget, and does that
-      improve end-to-end quality and latency?
+      activations and weights. And
+      <a href="https://arxiv.org/abs/2306.00978" target="_blank" rel="noreferrer">Activation-aware Weight Quantization (AWQ)</a>
+      uses activation-aware information to guide weight quantization. The
+      question here is narrower: can the allocation policy be explicitly
+      optimized for a constrained fast-memory budget, and does that improve
+      end-to-end quality and latency against relevant baselines?
     </p>
 
+    <h2>A note on token efficiency</h2>
     <p>
-      This is one possible extension of the broader token-efficiency argument.
-      Shorter sequences reduce the amount of work; precision routing asks how
-      efficiently each unit of work is represented and moved. Both matter, but
-      they are different budgets—and should be measured separately.
+      This connects to a broader question about efficient inference, but it is
+      not the same question as token efficiency. Shorter sequences reduce how
+      much work a model performs. Precision routing asks how efficiently each
+      unit of work is represented and moved. One reduces the amount of work;
+      the other tries to allocate resources within the work that remains.
+      They may complement each other, but they should be measured as separate
+      budgets.
+    </p>
+
+    <h2>Where the question leaves us</h2>
+    <p>
+      The appeal of dynamic precision is easy to understand: not every value
+      should necessarily receive the same treatment. The harder question is
+      whether we can identify the values that matter, cheaply enough for the
+      identification to be worthwhile, and in a way the hardware can execute
+      efficiently.
+    </p>
+    <p>
+      CADO begins with a modest proposal: use activation information to decide
+      where to spend a limited precision budget, then judge the decision by
+      the complete system, not by the numerical approximation alone. The
+      mathematics explains why the allocation might matter. Only a careful
+      comparison can tell us whether it does.
     </p>
 
     <h2>References</h2>
     <ul>
       <li>
-        <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noreferrer">LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</a>. Dettmers et al. 2022.
+        <a href="https://arxiv.org/abs/2208.07339" target="_blank" rel="noreferrer">LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</a>. Dettmers et al., 2022.
       </li>
       <li>
-        <a href="https://arxiv.org/abs/2211.10438" target="_blank" rel="noreferrer">SmoothQuant: Accurate and Efficient 8-bit Quantization for Large Language Models</a>. Xiao et al. 2022.
+        <a href="https://arxiv.org/abs/2211.10438" target="_blank" rel="noreferrer">SmoothQuant: Accurate and Efficient 8-bit Quantization for Large Language Models</a>. Xiao et al., 2022.
       </li>
       <li>
-        <a href="https://arxiv.org/abs/2306.00978" target="_blank" rel="noreferrer">AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</a>. Lin et al. 2023.
+        <a href="https://arxiv.org/abs/2306.00978" target="_blank" rel="noreferrer">AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</a>. Lin et al., 2023.
       </li>
       <li>
         <a href="https://github.com/shubhojit/CADO---Cache-Aware-Dynamic-Outlier-Offloading/tree/master" target="_blank" rel="noreferrer">CADO: Cache-Aware Dynamic Outlier Offloading</a>. Public prototype repository.
@@ -249,16 +479,11 @@ def cado_matrix_multiply(x, weights, threshold=6.0):
 </BaseLayout>
 
 <style>
-  .constraint {
-    margin: 28px 0;
-    padding: 18px 22px;
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
-    color: var(--text);
-    font: 500 18px/1.8 "DM Sans", sans-serif;
-  }
-
-  .constraint strong {
-    color: var(--accent);
+  .quiet-note {
+    margin: 24px 0;
+    padding-left: 16px;
+    border-left: 1px solid var(--line);
+    color: var(--muted, var(--text));
+    font-style: italic;
   }
 </style>
