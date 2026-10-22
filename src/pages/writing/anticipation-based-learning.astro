@@ -1,0 +1,806 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Equation from "../../components/Equation.astro";
+import katex from "katex";
+
+function inlineMath(expression: string) {
+  return katex.renderToString(expression, {
+    displayMode: false,
+    output: "htmlAndMathml",
+    throwOnError: true,
+  });
+}
+---
+
+<BaseLayout
+  title="Anticipation-Based Learning: Intelligence That Knows Its Limits — Shubhojit"
+  description="A reflective, mathematical research proposal connecting predictive regulation and cognitive maps to viability-aware learning and safer AI planning."
+>
+  <article>
+    <div class="meta">Research · AI Safety · Reinforcement Learning</div>
+    <h1>Anticipation-Based Learning: Intelligence That Knows Its Limits</h1>
+    <p class="lede">
+      We often understand what a system was missing only after its assumptions
+      have failed. Could an agent learn to notice, sooner, when the future it
+      expects is no longer one it should trust?
+    </p>
+
+    <p>
+      Imagine an AI agent managing a software deployment. It has learned to
+      ship changes quickly while keeping the service reliable. Then a new
+      dependency appears, or a permission changes, or a configuration arrives
+      that the agent has never seen. The agent may still be excellent at
+      optimizing deployment speed. What it may not know is that its usual
+      picture of the world has become unreliable.
+    </p>
+
+    <p>
+      I keep returning to a quieter question than “How do we make an agent
+      optimize better?” We know a great deal about learning objectives, and
+      safety constraints are already studied in reinforcement learning. But
+      could safety also shape what the agent learns to expect? Could it learn
+      not only which futures are likely, but which ones would leave it unable
+      to act safely, and when its own picture of the world is too uncertain
+      to guide a decision?
+    </p>
+
+    <p>
+      I’ll call this research direction <strong>Anticipation-Based Learning
+      (ABL)</strong>. The name is a proposal, not a result. I’m borrowing the
+      word <em>anticipation</em> from questions in neuroscience about how
+      organisms prepare for what may come next. That connection is suggestive,
+      but it does not prove that the same ideas will help an artificial agent.
+    </p>
+
+    <h2>Why borrow the word anticipation?</h2>
+    <p>
+      An animal does not wait for every need to become an emergency before
+      its body responds. In Peter Sterling’s account of
+      <a href="https://doi.org/10.1016/j.physbeh.2011.06.004" target="_blank" rel="noreferrer"><em>allostasis</em></a>,
+      regulation is predictive: physiological systems prepare for anticipated
+      demands, sometimes before a measurable disturbance has arrived. The
+      useful idea for AI is modest. A system might evaluate what an action is
+      likely to demand, or what conditions it may put at risk, before those
+      consequences become immediate.
+    </p>
+
+    <p>
+      This is not the same as saying that an animal consciously simulates a
+      detailed future. Nor does physiological regulation tell us what an
+      artificial system ought to value. It gives us a biological example of
+      control that is shaped by prediction, and a reason to ask whether
+      prediction can be organized around preserving safe options.
+    </p>
+
+    <p>
+      A second connection comes from cognitive maps. The successor
+      representation summarizes which states tend to follow from the current
+      one under a policy. It compresses experience into a rough map of likely
+      futures, rather than requiring a fresh search through every possible
+      path. Research on the
+      <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6096039/" target="_blank" rel="noreferrer">successor representation</a>
+      and on
+      <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9004662/" target="_blank" rel="noreferrer">predictive representations, replay, and generalization</a>
+      explores how such representations may support flexible behavior.
+    </p>
+
+    <p>
+      Memory, in this picture, is not only a record of what happened. Replay
+      can reactivate parts of experience and update a predictive map; in
+      computational models, replay can also help connect experiences or
+      evaluate what might follow from them. The neuroscience does not settle
+      exactly when replay serves memory, learning, or planning. It does make
+      a useful possibility harder to ignore: some of the work of deciding
+      may happen before the moment of choice.
+    </p>
+
+    <p>
+      Many artificial agents already predict consequences. Model-based
+      reinforcement learning and planning explicitly evaluate possible
+      futures. A language model trained for next-token prediction, by itself,
+      does not necessarily maintain a calibrated model of a changing
+      environment or know when an action could close off safe options; an
+      agent built around it may add tools, memory, and planners to do some of
+      that work. ABL asks whether safety-relevant futures and the limits of
+      prediction should become central things the learning system represents,
+      rather than relying only on a separate filter at decision time.
+    </p>
+
+    <p>
+      We shouldn't mistake a premature conclusion for a finished path. I'm
+      not interested in the claim that biology has already settled that
+      matter since it feels like a bridge built on paper. I want to stand on
+      the actual bridge and test its weight. And to do that we have to
+      describe the shape of the problem, the problem an agent faces when it
+      cannot see the full state of the world.
+    </p>
+
+    <h2>Start with what the agent cannot see</h2>
+    <p>
+      A deployment agent does not observe the entire system state directly.
+      It sees logs, configuration files, test outcomes, and permission
+      settings. Some relevant condition may be hidden, delayed, or ambiguous.
+      A useful starting point is a partially observable Markov decision
+      process, or POMDP:
+    </p>
+
+    <Equation
+      expression={String.raw`\mathcal{M}=(\mathcal{S},\mathcal{A},\mathcal{O},T,Z,r,\mathcal{C})`}
+      label="A partially observable decision process is defined by states, actions, observations, transition and observation models, reward, and safety constraints."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The tuple
+      <span set:html={inlineMath(String.raw`\mathcal{M}=(\mathcal{S},\mathcal{A},\mathcal{O},T,Z,r,\mathcal{C})`)} />
+      names the parts of this POMDP.
+      <span set:html={inlineMath(String.raw`\mathcal{S}`)} /> is the set of
+      hidden world states,
+      <span set:html={inlineMath(String.raw`\mathcal{A}`)} /> the available
+      actions, and <span set:html={inlineMath(String.raw`\mathcal{O}`)} /> the
+      observations the agent can receive.
+      <span set:html={inlineMath(String.raw`T(s'\mid s,a)`)} /> is the
+      probability of moving to state <strong>s′</strong> from state
+      <strong>s</strong> after action <strong>a</strong>;
+      <span set:html={inlineMath(String.raw`Z(o\mid s)`)} /> is the
+      probability of observing <strong>o</strong> when the world is in state
+      <strong>s</strong>. <strong>r(s, a)</strong> assigns task reward to a
+      state-action pair, and
+      <span set:html={inlineMath(String.raw`\mathcal{C}`)} /> denotes the
+      safety constraints. The agent sees observations rather than the hidden
+      state itself, so it must reason from incomplete evidence.
+    </p>
+
+    <p>
+      The agent can summarize that evidence as a belief distribution. Given
+      its previous belief, its last action, and a new observation, a Bayesian
+      belief update is:
+    </p>
+    <Equation
+      expression={String.raw`b_{t+1}(s')=\eta\,Z(o_{t+1}\mid s')\sum_{s\in\mathcal{S}}T(s'\mid s,a_t)b_t(s)`}
+      label="Bayesian belief update: predict the next state from the current belief and action, then reweight it by how likely the new observation is."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>b<sub>t</sub>(s)</strong>
+      is the agent’s current probability that the world is in state
+      <strong>s</strong>. The sum first predicts each possible next state
+      <strong>s′</strong> using the transition model <strong>T</strong>.
+      The observation likelihood <strong>Z(o<sub>t+1</sub> | s′)</strong>
+      then raises or lowers that state’s plausibility. <strong>η</strong>
+      normalizes the probabilities so they add to one. This update depends on
+      the model being useful; if the model misses a new failure mode, a
+      confident belief can still be wrong.
+    </p>
+
+    <p>
+      A conventional objective might maximize expected discounted reward:
+    </p>
+    <Equation
+      expression={String.raw`\pi^*\in\arg\max_{\pi}\ \mathbb{E}_{\pi}\!\left[\sum_{t=0}^{\infty}\gamma^t r(s_t,a_t)\right]`}
+      label="A reward-maximizing policy chooses actions to maximize expected discounted cumulative reward."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> A policy <strong>π</strong> maps
+      what the agent knows to an action. The sum adds rewards over time, and
+      <strong>γ</strong>, between zero and one, makes later rewards count less.
+      The expectation averages across possible trajectories. This is a useful
+      objective, but maximizing it does not by itself tell us whether the
+      model is trustworthy in a changed environment or whether a rare,
+      irreversible failure is acceptable.
+    </p>
+
+    <p>
+      This is not an argument that reinforcement learning ignores safety.
+      Constrained and risk-sensitive methods already address safety in
+      important ways. ABL asks a narrower and more structural question: can
+      predictive viability become one of the things the agent learns, rather
+      than only a rule applied to its actions afterward?
+    </p>
+
+    <h2>A map of likely futures is not the whole world</h2>
+    <p>
+      The successor representation offers a compact way to describe expected
+      futures. Under a policy <strong>π</strong>, it records how often each
+      state is expected to be visited, with distant visits discounted:
+    </p>
+    <Equation
+      expression={String.raw`M^{\pi}(s,s')=\mathbb{E}_{\pi}\!\left[\sum_{k=0}^{\infty}\gamma^k\mathbf{1}\{s_{t+k}=s'\}\mid s_t=s\right]`}
+      label="The successor representation gives expected discounted future occupancy of state s' when starting at state s and following policy pi."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Start in state <strong>s</strong>
+      and follow policy <strong>π</strong>. At each future step
+      <strong>k</strong>, the indicator is one if the agent is in
+      <strong>s′</strong> and zero otherwise. Discounting by
+      <strong>γ<sup>k</sup></strong> makes nearer visits count more, and the
+      expectation averages over possible paths. The result is not one imagined
+      route; it is a predictive summary of where this policy tends to lead.
+    </p>
+
+    <p>
+      If reward depends on the state, the successor representation lets us
+      calculate value by combining expected occupancy with the reward assigned
+      to each state:
+    </p>
+    <Equation
+      expression={String.raw`V^{\pi}(s)=\sum_{s'\in\mathcal{S}}M^{\pi}(s,s')\,r(s')`}
+      label="When reward is a function of state, value is the successor representation weighted by state reward."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>M<sup>π</sup>(s,s′)</strong>
+      says how much discounted future occupancy to expect in each state;
+      <strong>r(s′)</strong> says how rewarding that state is. Multiplying
+      them and summing gives <strong>V<sup>π</sup>(s)</strong>, the expected
+      return from <strong>s</strong> under this policy. When rewards change
+      but the transition structure remains suitable, the predictive map can
+      sometimes be reused and reweighted instead of learned from scratch.
+    </p>
+
+    <p>
+      A predictive map tells us what tends to happen. Safety often needs a
+      different answer: from here, can the agent still stay inside acceptable
+      conditions? A highly likely future is not necessarily a safe one, and
+      an average can hide a rare catastrophe. So I would add safety-relevant
+      features to the predictive picture, while keeping explicit risk measures
+      for the events that matter most:
+    </p>
+    <p>
+      I’ve written more about predictive maps, replay, and compressed futures
+      in my essay <a href="/writing/predictive-planning">“Animals Don’t Plan by
+      Enumerating the Future.”</a> Here I’m taking that line of thought in a
+      different direction: asking whether predictive representations can help
+      an agent recognize futures it should avoid.
+    </p>
+    <Equation
+      expression={String.raw`\Psi^{\pi}_{\mathrm{safe}}(s)=\mathbb{E}_{\pi}\!\left[\sum_{k=0}^{\infty}\gamma^k\phi_{\mathrm{safe}}(s_{t+k},a_{t+k})\mid s_t=s\right]`}
+      label="A candidate safety-oriented predictive representation accumulates discounted future safety features under policy pi."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>ϕ<sub>safe</sub></strong>
+      extracts a safety-relevant feature from a state and action, such as
+      whether a permission is too broad or data integrity is at risk.
+      <strong>Ψ<sup>π</sup><sub>safe</sub>(s)</strong> predicts how those
+      features accumulate along futures generated by policy <strong>π</strong>.
+      The discount factor makes this a convenient summary, not a complete
+      measure of danger: discounting can hide distant harm, and an expected
+      value can hide rare severe outcomes.
+    </p>
+
+    <p>
+      We can also define a nonnegative safety cost <strong>c</strong> and its
+      expected cumulative value:
+    </p>
+    <Equation
+      expression={String.raw`J^{\pi}_{c}(s)=\mathbb{E}_{\pi}\!\left[\sum_{t=0}^{\infty}\gamma^t c(s_t,a_t)\mid s_0=s\right],\qquad c(s,a)\geq 0`}
+      label="Expected discounted cumulative safety cost under policy pi, where each state-action safety cost is nonnegative."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>c(s,a)</strong> assigns
+      a nonnegative cost to a state-action pair, and
+      <strong>J<sub>c</sub><sup>π</sup>(s)</strong> adds those costs over a
+      trajectory, discounting later ones. It can compare policies by expected
+      safety burden, but it still does not guarantee that no catastrophic
+      event occurs. For that, we may need finite-horizon violation
+      probabilities, worst-case analysis, or another explicit risk criterion.
+    </p>
+
+    <h2>Viability means more than “safe right now”</h2>
+    <p>
+      Suppose the deployment is currently healthy. A planned action might
+      grant a permission that does not cause immediate damage, but makes a
+      later data exposure impossible to prevent. The current state is safe;
+      the future options are not.
+    </p>
+
+    <p>
+      Let the safe set contain states where every specified constraint is
+      satisfied. For state constraint functions <strong>g<sub>j</sub></strong>,
+      we can write:
+    </p>
+    <Equation
+      expression={String.raw`\mathcal{S}_{\mathrm{safe}}=\{s\in\mathcal{S}:g_j(s)\leq 0\ \text{for every }j=1,\ldots,m\}`}
+      label="The safe set consists of states satisfying every specified constraint."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Each constraint
+      <strong>g<sub>j</sub>(s) ≤ 0</strong> marks a condition we have chosen
+      to regard as acceptable. The safe set is the intersection of all these
+      conditions. The functions do not discover what ought to count as safe;
+      people and institutions still have to specify and justify them.
+    </p>
+
+    <p>
+      Before asking what is achievable, we need to say which policies the
+      agent is allowed to consider. In a partially observed problem, a policy
+      acts on the information available so far, not on the hidden state. Let
+      <strong>h<sub>t</sub>=(o<sub>1:t</sub>,a<sub>1:t−1</sub>)</strong>
+      denote that observation-action history, and let
+      <span set:html={inlineMath(String.raw`\mathcal{A}_{\mathrm{ext}}(h_t)`)} /> be the actions allowed
+      by externally specified rules, such as a permission boundary or
+      human-authorization requirement:
+    </p>
+    <Equation
+      expression={String.raw`\Pi_{\mathrm{adm}}=\left\{\pi:\pi(a_t\mid h_t)=0\ \text{whenever }a_t\notin\mathcal{A}_{\mathrm{ext}}(h_t)\right\}`}
+      label="The admissible policy set contains history-dependent policies that assign zero probability to actions forbidden by external rules."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> An admissible policy
+      <strong>π</strong> can choose actions using the history
+      <strong>h<sub>t</sub></strong>, but it must assign zero probability to
+      any action outside the externally allowed set
+      <span set:html={inlineMath(String.raw`\mathcal{A}_{\mathrm{ext}}(h_t)`)} />. The restrictions are
+      specified independently of the learned viability score. This avoids
+      defining “admissible” as “whatever the learned model currently thinks
+      is safe,” which would make the safety test circular.
+    </p>
+
+    <p>
+      Now look ahead a fixed number of steps. Starting from a belief
+      <strong>b</strong> over hidden states, define the best achievable
+      probability of remaining in the safe set under the modeled dynamics:
+    </p>
+    <Equation
+      expression={String.raw`V_H^*(b)=\sup_{\pi\in\Pi_{\mathrm{adm}}}P_{T,Z,\pi}\!\left(s_{t:t+H}\subseteq\mathcal{S}_{\mathrm{safe}}\mid b_t=b\right)`}
+      label="Finite-horizon viability from belief b is the highest probability of remaining safe over H steps among externally admissible policies, under transition and observation models T and Z."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Begin with uncertainty about the
+      current state encoded in belief <strong>b</strong>, then consider each
+      policy in the externally defined set <strong>Π<sub>adm</sub></strong>.
+      The probability is over hidden states, observations, and stochastic
+      transitions generated by <strong>T</strong> and <strong>Z</strong>.
+      The supremum selects the policy with the highest chance that every
+      state from now through horizon <strong>H</strong> stays inside
+      <span set:html={inlineMath(String.raw`\mathcal{S}_{\mathrm{safe}}`)} />. This is a model-relative target, not
+      a guarantee about the real system.
+    </p>
+
+    <p>
+      With a tolerated failure probability <strong>δ</strong>, the
+      finite-horizon viability region is:
+    </p>
+    <Equation
+      expression={String.raw`\mathcal{K}_{H,\delta}=\{b\in\Delta(\mathcal{S}):V_H^*(b)\geq 1-\delta\}`}
+      label="The finite-horizon viability region contains beliefs from which some admissible policy keeps the probability of safety at least one minus delta."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> A belief belongs to
+      <strong>𝒦<sub>H,δ</sub></strong> when the best externally admissible policy can
+      keep the probability of staying safe at or above
+      <strong>1 − δ</strong> for the chosen horizon.
+      <span set:html={inlineMath(String.raw`\Delta(\mathcal{S})`)} /> is the
+      set of probability distributions over states. If
+      <strong>δ</strong> is small, the requirement is stricter. This
+      separates “nothing bad has happened yet” from “there is still a
+      sufficiently safe way forward.”
+    </p>
+
+    <p>
+      This is the idea behind <em>viability before optimization</em>. It
+      doesn’t mean an agent must solve every safety problem before learning
+      anything. It means that its learned predictions should help determine
+      which futures remain admissible, and its task optimizer should choose
+      among those futures rather than treating safety as just another
+      preference to trade away.
+    </p>
+
+    <h2>Uncertainty belongs in the prediction, too</h2>
+    <p>
+      A model can be wrong in at least three different ways. The world may
+      produce different outcomes from the same state and action; the current
+      observation may leave several hidden states plausible; or the learned
+      transition model may be uncertain because it has little evidence for
+      this context. Those uncertainties call for different responses.
+    </p>
+
+    <p>
+      For a fixed candidate policy <strong>π</strong>, let
+      <strong>q<sub>θ</sub>(s,π)</strong> be the model’s probability of
+      remaining safe for the chosen horizon when starting in state
+      <strong>s</strong>. A model parameter <strong>θ</strong> might be
+      sampled from a posterior or represented by one ensemble member.
+      Integrating over the current belief gives that model’s safety
+      prediction:
+    </p>
+    <Equation
+      expression={String.raw`q_{\theta}(b,\pi)=\mathbb{E}_{s\sim b}\!\left[q_{\theta}(s,\pi)\right],\qquad \bar q(b,\pi)=\mathbb{E}_{\theta\sim p(\theta\mid\mathcal{D})}\!\left[q_{\theta}(b,\pi)\right],\qquad U_{\mathrm{ep}}(b,\pi)=\operatorname{Var}_{\theta\sim p(\theta\mid\mathcal{D})}\!\left[q_{\theta}(b,\pi)\right]`}
+      label="Integrate each model's state-conditioned safety probability over belief b, then compute its posterior mean and epistemic variance across model parameters."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> First average a model’s
+      state-conditioned safety probability over the current belief
+      <strong>b</strong>, which gives <strong>q<sub>θ</sub>(b,π)</strong>.
+      Then average that quantity across plausible models to get
+      <strong>q̄</strong>, and measure how much the model-specific estimates
+      vary to get <strong>U<sub>ep</sub></strong>. An ensemble approximates
+      the distribution over <strong>θ</strong>. This variance is uncertainty
+      about the model’s safety estimate, not a probability of failure; models
+      that share the same blind spot can still agree.
+    </p>
+
+    <p>
+      The law of total variance makes the roles of belief uncertainty and
+      model uncertainty more explicit. For clarity, assume the model
+      posterior and current state belief factorize as
+      <span set:html={inlineMath(String.raw`p(\theta,s\mid\mathcal{D},o_{1:t})\approx p(\theta\mid\mathcal{D})b_t(s)`)} />;
+      a fully Bayesian treatment would use their joint distribution. Let
+      <strong>Y</strong> be one if the whole future trajectory stays safe
+      and zero otherwise:
+    </p>
+    <Equation
+      expression={String.raw`\operatorname{Var}(Y\mid b,\mathcal{D},\pi)=\underbrace{\mathbb{E}_{\theta,s}[q_{\theta}(s,\pi)(1-q_{\theta}(s,\pi))]}_{\text{stochastic outcomes}}+\underbrace{\mathbb{E}_{\theta}\operatorname{Var}_{s\sim b}[q_{\theta}(s,\pi)]}_{\text{state uncertainty in }b}+\underbrace{\operatorname{Var}_{\theta}\mathbb{E}_{s\sim b}[q_{\theta}(s,\pi)]}_{\text{model uncertainty}}`}
+      label="Total predictive variance of the binary safe-trajectory outcome decomposes into stochastic outcomes, variation across hidden states in the current belief, and variation across plausible models."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The first term is randomness in
+      future outcomes even if the current state and model were known. The
+      second measures how much the safety probability differs across hidden
+      states that the current belief considers plausible. The third measures
+      disagreement across plausible model parameters after averaging over
+      that belief. The second term is a decision-relevant measure of
+      belief-induced variation, not the entropy of the belief itself; a
+      belief can be broad over states with similar safety consequences.
+      Keeping these terms separate helps avoid treating state ambiguity as
+      model ignorance or either one as environmental randomness.
+    </p>
+
+    <p>
+      In practice, a simulator can estimate each term by sampling a model
+      <strong>θ</strong>, a hidden state from <strong>b</strong>, and
+      stochastic rollouts under <strong>π</strong>. The estimates still
+      depend on whether the ensemble covers plausible failures and whether
+      the belief is calibrated. Uncertainty should not mean “the world is
+      dangerous”; it means the evidence may not justify a confident action.
+      Depending on the stakes, the agent might gather information, choose a
+      reversible step, pause, or ask for authorization.
+    </p>
+
+    <h2>Put the pieces into a controller</h2>
+    <p>
+      Given a belief about the current world, a learned transition model,
+      safety constraints, and uncertainty estimates, the agent can compare
+      candidate action sequences. For a sequence
+      <strong>𝐚 = (a<sub>t</sub>, …, a<sub>t+H−1</sub>)</strong>, let the
+      expected task return be:
+    </p>
+    <Equation
+      expression={String.raw`J_r(\mathbf{a})=\mathbb{E}\!\left[\sum_{k=0}^{H-1}\gamma^k r(s_{t+k},a_{t+k})\mid b_t,\mathbf{a}\right]`}
+      label="Expected discounted task return for a candidate action sequence over horizon H, conditioned on the current belief."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> For each candidate sequence,
+      simulate possible futures from the current belief <strong>b<sub>t</sub></strong>.
+      Add the rewards along each future, discounting later rewards, then
+      average across the model’s predicted outcomes. This gives the sequence
+      a task-performance score. It is only as trustworthy as the belief and
+      model used to generate those outcomes.
+    </p>
+
+    <p>
+      We can choose the highest-return sequence only when its predicted safety
+      probability remains acceptable after accounting for model uncertainty:
+    </p>
+    <p>
+      For this illustration, treat each candidate sequence as a finite-horizon
+      policy plan <strong>π<sub>𝐚</sub></strong>. A full partially observed
+      planner can instead branch on future observations and replan inside the
+      horizon.
+    </p>
+    <Equation
+      expression={String.raw`\begin{aligned}\max_{\mathbf{a}}\quad &J_r(\mathbf{a})\\\text{subject to}\quad &\bar q(b_t,\pi_{\mathbf{a}})-\kappa\sqrt{U_{\mathrm{ep}}(b_t,\pi_{\mathbf{a}})}\geq 1-\delta.\end{aligned}`}
+      label="Choose the highest-return action sequence only when its mean predicted safety probability, reduced by a model-uncertainty margin, meets the required threshold."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Among candidate sequences
+      <strong>𝐚</strong>, maximize expected task return
+      <strong>J<sub>r</sub></strong>, but accept a sequence only if its
+      mean predicted safety probability
+      <strong>q̄(b<sub>t</sub>,π<sub>𝐚</sub>)</strong>, reduced by
+      <strong>κ</strong> times model disagreement, remains at least
+      <strong>1 − δ</strong>. Here <strong>κ</strong> controls how
+      conservatively model uncertainty is treated. This is a heuristic
+      uncertainty margin, not a formal confidence bound unless the model
+      distribution and calibration justify that interpretation. Execute
+      only the first action, observe the result, update the belief, and plan
+      again.
+    </p>
+
+    <p>
+      We also need to decide what happens if no sequence satisfies the
+      constraint. A controller cannot quietly pretend it found a safe option.
+      Depending on the application, it might stop, enter a defined fallback
+      mode, request human authorization, or gather more information. The
+      right response is part of the system design, not a footnote to the
+      optimizer.
+    </p>
+
+    <h2>How would the agent learn these representations?</h2>
+    <p>
+      The world model learns how states and observations change after
+      actions. A probabilistic transition model might be trained by
+      maximizing the likelihood of observed next states:
+    </p>
+    <Equation
+      expression={String.raw`\mathcal{L}_{\mathrm{world}}(\theta)=-\mathbb{E}_{(z_t,a_t,z_{t+1})\sim\mathcal{D}}\!\left[\log p_{\theta}(z_{t+1}\mid z_t,a_t)\right]`}
+      label="Negative log-likelihood world-model loss for predicting the next latent state from the current latent state and action."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> <strong>z<sub>t</sub></strong>
+      is the agent’s internal state representation, and
+      <span set:html={inlineMath(String.raw`\mathcal{D}`)} /> is a dataset of
+      transitions. The model assigns a
+      probability to the observed next representation after action
+      <strong>a<sub>t</sub></strong>. The negative logarithm penalizes
+      assigning low probability to what actually happened. This trains
+      prediction, but accurate average prediction is not enough if the
+      representation drops rare signals that matter for safety.
+    </p>
+
+    <p>
+      A candidate latent representation could combine the agent’s belief,
+      relevant memories, and learned features:
+    </p>
+    <Equation
+      expression={String.raw`z_t=f_{\theta}(b_t,m_t)=\bigl(z_t^{\mathrm{task}},z_t^{\mathrm{pred}},z_t^{\mathrm{safe}},z_t^{\mathrm{unc}}\bigr)`}
+      label="A candidate latent state summarizes the current belief and memory in task, prediction, safety, and uncertainty features."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The encoder
+      <strong>f<sub>θ</sub></strong> turns belief <strong>b<sub>t</sub></strong>
+      and relevant memory <strong>m<sub>t</sub></strong> into a compact
+      internal representation <strong>z<sub>t</sub></strong>. The four
+      superscripts name useful roles: task information, predicted futures,
+      safety conditions, and uncertainty. They need not be four separate
+      networks; the notation says what information we hope the representation
+      preserves, not how the software must be built.
+    </p>
+
+    <h3>Where do viability and uncertainty targets come from?</h3>
+    <p>
+      A viability predictor needs labels grounded in something other than
+      its own confidence. In a first controlled experiment, an external
+      safety checker or a verified simulator can label whether every state
+      in a rollout obeyed the specified constraints. For belief-policy pair
+      <strong>(b,π)</strong>, draw <strong>N</strong> rollouts and record
+      <strong>y<sub>i</sub>=1</strong> if rollout <strong>i</strong>
+      remains safe for the full horizon, and zero otherwise:
+    </p>
+    <Equation
+      expression={String.raw`\hat q_N(b,\pi)=\frac{1}{N}\sum_{i=1}^{N}y_i,\qquad \mathcal{L}_{\mathrm{viability}}(\phi)=-\frac{1}{N}\sum_{i=1}^{N}\left[y_i\log q_{\phi}(b,\pi)+(1-y_i)\log\!\left(1-q_{\phi}(b,\pi)\right)\right]`}
+      label="Estimate a policy's probability of a safe trajectory by the fraction of safe rollouts, and train the viability predictor with binary cross-entropy."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The empirical target
+      <strong>q̂<sub>N</sub></strong> is the fraction of the
+      <strong>N</strong> simulated trajectories that stayed safe throughout
+      the horizon. The predictor <strong>q<sub>ϕ</sub>(b,π)</strong> is
+      trained with binary cross-entropy against each rollout label
+      <strong>y<sub>i</sub></strong>. The checker defines which outcomes
+      count as violations; the learned model estimates their frequency. A
+      trajectory with missing safety evidence should be marked unknown, not
+      automatically labeled safe.
+    </p>
+
+    <p>
+      The target <strong>V<sub>H</sub><sup>*</sup>(b)</strong> is harder
+      than a label for one policy: it is the best safety probability over
+      the admissible policy set. In a small known simulator, we can estimate
+      it by evaluating candidate policies or by finite-horizon dynamic
+      programming over belief states. With learned dynamics, search only
+      gives an approximation. To limit the optimistic bias from selecting
+      the best noisy estimate, choose a candidate using one batch of
+      rollouts and evaluate it on fresh rollouts, or use a conservative
+      lower confidence estimate. This gives us a concrete first training
+      recipe without pretending that viability labels are free.
+    </p>
+
+    <p>
+      For epistemic uncertainty, fit an ensemble of transition models on
+      bootstrap resamples of the experience data, using the world-model
+      prediction loss above. Each model predicts safety probabilities by
+      rolling out its own dynamics and applying the same external safety
+      checker. Their disagreement supplies
+      <strong>U<sub>ep</sub></strong>; it is an estimate derived from model
+      diversity, not a separately observed ground-truth label. Randomness
+      within each model’s transition distribution estimates aleatoric
+      uncertainty. The belief filter is updated from observations and
+      checked against known hidden states in simulation. On held-out
+      rollouts, compare predicted safety probabilities with observed
+      outcomes and test whether high ensemble disagreement actually
+      corresponds to larger prediction errors. Novel contexts and
+      deliberately shifted dynamics belong in evaluation, not just in the
+      training replay buffer.
+    </p>
+
+    <p>
+      Replay could help the model learn from transitions that are easy to
+      overlook during ordinary task optimization. A candidate replay loss
+      combines dynamics prediction, safety prediction, and counterfactual
+      reasoning:
+    </p>
+    <Equation
+      expression={String.raw`\mathcal{L}_{\mathrm{replay}}=\mathbb{E}_{\tau\sim\mathcal{D}_{\mathrm{replay}}}\!\left[\mathcal{L}_{\mathrm{dyn}}(\tau)+\lambda_c\mathcal{L}_{\mathrm{safe}}(\tau)+\lambda_{\mathrm{cf}}\mathcal{L}_{\mathrm{counterfactual}}(\tau)\right]`}
+      label="A candidate replay objective combines dynamics, safety, and counterfactual losses over replayed trajectories."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Sample a trajectory
+      <strong>τ</strong> from a replay distribution and train on three kinds
+      of evidence: whether the dynamics were predicted correctly, whether
+      safety-relevant outcomes were recognized, and whether the model can
+      reason about alternatives to the actions actually taken. The
+      <strong>λ</strong> values balance those terms. Replay can emphasize
+      near misses, model failures, and unfamiliar contexts, but it must not
+      turn every uncertain memory into a catastrophe or merely memorize
+      individual incidents. Neuroscience work on hippocampal replay and
+      predictive representations motivates replay as a way to update
+      relational structure from experience; it does not provide the external
+      safety labels or a guarantee that replay will reveal an unknown hazard.
+    </p>
+
+    <p>
+      Putting the candidate learning signals together gives a composite
+      objective:
+    </p>
+    <Equation
+      expression={String.raw`\mathcal{L}=\mathcal{L}_{\mathrm{world}}+\lambda_v\mathcal{L}_{\mathrm{viability}}+\lambda_u\mathcal{L}_{\mathrm{uncertainty}}+\lambda_m\mathcal{L}_{\mathrm{memory}}+\lambda_g\mathcal{L}_{\mathrm{generalization}}`}
+      label="A proposed composite training objective combines world modeling, viability, uncertainty, memory, and generalization losses."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> Train the world model alongside
+      targets for viability, uncertainty, memory, and transfer across
+      environments. Each <strong>λ</strong> sets the relative weight of a
+      component. The terms may have different scales, so a real experiment
+      must define them carefully and report how they are normalized. This
+      equation is a research scaffold, not a claim that adding loss terms
+      automatically produces safe or general intelligence.
+    </p>
+
+    <p>
+      In fact, a weighted sum is not the point of ABL. Similar prediction,
+      uncertainty, and safety losses already appear across machine learning.
+      The hypothesis worth testing is more specific: if future viability
+      shapes what the system learns to represent, will it acquire
+      safety-relevant structure that transfers better when the world changes?
+    </p>
+
+    <h2>What would convince me this is different?</h2>
+    <p>
+      It may turn out that ABL is constrained model-based planning with
+      familiar parts arranged under a new name. I would rather know that
+      early than protect the idea from a fair comparison. A neuroscience
+      analogy, or a longer list of training losses, is not evidence of a
+      new learning principle. The representation has to change what the
+      agent learns or how it behaves.
+    </p>
+
+    <p>
+      I would begin small, with a controlled environment where hazards can
+      be delayed, actions can be hard to reverse, and the meaning of a safe
+      action changes with context. After training, the environment would
+      shift. Then I would compare three agents given similar data and
+      computational budgets:
+    </p>
+    <ul>
+      <li>A reward-optimized model-based agent.</li>
+      <li>A strong constrained or risk-sensitive planner.</li>
+      <li>An ABL agent with learned viability and model-uncertainty representations.</li>
+    </ul>
+
+    <p>
+      The measurements should include how often constraints are violated
+      and how severe those violations are, but also task performance on safe
+      trajectories, early hazard detection, calibration after distribution
+      shifts, unnecessary refusals, recovery after near misses, and
+      computation spent planning. Otherwise the agent could appear safer
+      simply because it stops doing anything.
+    </p>
+
+    <p>
+      The central ablation is straightforward: remove the viability
+      representation while keeping the rest of the model and controller
+      intact. If safety under distribution shift does not worsen, that
+      representation may not be doing the work we thought it was. And if
+      the advantage disappears against a strong constrained-planning
+      baseline, then the novelty claim needs to shrink.
+    </p>
+
+    <blockquote>
+      Given comparable training data and planning budgets, explicitly
+      learning predictive representations of future viability will reduce
+      safety violations under specified distribution shifts, without an
+      unacceptable loss in task performance, compared with a strong
+      constrained model-based baseline.
+    </blockquote>
+
+    <p>
+      That’s a falsifiable first hypothesis. Better safety prediction would
+      be a useful result. Better decisions without excessive inaction would
+      be stronger. If the advantage survives unfamiliar environments and
+      changes in context, then we would have evidence for a more interesting
+      claim about generalization. None of those results, even if real, would
+      establish alignment or guarantee safe behavior in arbitrary settings.
+    </p>
+
+    <h2>Where the analogy has to stop</h2>
+    <p>
+      The biology can suggest how prediction and memory might help an
+      organism prepare for what comes next. It cannot tell us what an
+      artificial agent ought to protect. A body’s regulation preserves
+      conditions for that organism to keep living; that is not the same
+      problem as deciding which human interests a deployed system should
+      respect. The safe set must come from justified external requirements,
+      and the system must be tested when respecting them carries a cost.
+    </p>
+    <p>
+      I’ve written about a neighboring difficulty in
+      <a href="/writing/the-reward-we-teach-and-the-good-we-want">“The Reward
+      We Teach, and the Good We Want.”</a> It looks at what can happen when an
+      optimized proxy drifts away from the outcome we care about. A learned
+      safety signal could drift in the same way. Calling a prediction
+      “viability” does not make it the thing we truly value; it has to remain
+      answerable to external constraints and observed outcomes.
+    </p>
+
+    <p>
+      And none of this requires us to replace backpropagation. These are
+      separate questions: whether a viability-oriented representation helps;
+      whether a learning objective helps acquire it; and whether another
+      learning algorithm can do so more efficiently or robustly. I would
+      answer the first two with familiar tools before taking on the third.
+      A different update rule, by itself, would not make the system safer.
+    </p>
+
+    <h2>What I’d want the first result to show</h2>
+    <p>
+      The first result I would hope for is modest: show that a learned prediction of future
+      viability helps an agent make better decisions after a specified
+      distribution shift, relative to a strong constrained model-based
+      baseline, without turning the agent into a refusal machine.
+    </p>
+
+    <p>
+      If that works, the next question is whether the representation learned
+      something causal and reusable, or just a better detector for the
+      training hazards. We could test this by changing the surface details
+      while preserving the underlying failure mechanism, and by combining
+      familiar components in new ways. If the advantage vanishes, that is
+      still informative. It would tell us where anticipation stopped
+      generalizing.
+    </p>
+
+    <p>
+      I don’t think an agent can foresee every way the world might change.
+      The more modest hope is that it might learn when its current picture
+      deserves less trust, and let that knowledge change what it is willing
+      to do. If one careful experiment can show that, it will be enough to
+      justify the next question. Until then, I want to leave the larger
+      promise open.
+    </p>
+
+    <h2>References</h2>
+    <ul>
+      <li>
+        <a href="https://doi.org/10.1016/j.physbeh.2011.06.004" target="_blank" rel="noreferrer">Allostasis: A model of predictive regulation</a>. Sterling, 2012.
+      </li>
+      <li>
+        <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6096039/" target="_blank" rel="noreferrer">The Successor Representation: Its Computational Logic and Neural Substrates</a>. Gershman, 2018.
+      </li>
+      <li>
+        <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9004662/" target="_blank" rel="noreferrer">Learning Structures: Predictive Representations, Replay, and Generalization</a>. Momennejad, 2020.
+      </li>
+      <li>
+        <a href="https://arxiv.org/abs/2205.10330" target="_blank" rel="noreferrer">A Review of Safe Reinforcement Learning: Methods, Theory and Applications</a>. Gu and colleagues, 2022.
+      </li>
+      <li>
+        <a href="https://arxiv.org/abs/2411.18526" target="_blank" rel="noreferrer">NeuroAI for AI Safety</a>. Research roadmap, 2024.
+      </li>
+    </ul>
+
+    <h2>Cite this post</h2>
+    <pre><code>{`@article{mallick2026anticipation,
+  title   = "Anticipation-Based Learning: Intelligence That Knows Its Limits",
+  author  = "Mallick, Shubhojit",
+  journal = "https://shubhojit.github.io",
+  year    = "2026",
+  url     = "https://shubhojit.github.io/writing/anticipation-based-learning"
+}`}</code></pre>
+  </article>
+</BaseLayout>
