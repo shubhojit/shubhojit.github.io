@@ -660,6 +660,196 @@ function inlineMath(expression: string) {
       safety-relevant structure that transfers better when the world changes?
     </p>
 
+    <h2>The clean formulation meets a large world</h2>
+    <p>
+      In a small simulator, we can sometimes list the states, inspect the
+      transitions, and try every action we can think of. Real systems are
+      less obliging. Their states may be continuous, their observations
+      incomplete, and their possible policies far too numerous to enumerate.
+      Even the belief <strong>b<sub>t</sub></strong> may be a distribution
+      over an enormous space, not a tidy vector we can hand to an optimizer.
+    </p>
+
+    <p>
+      So an implementation would have to compress the history into a learned
+      state <strong>z<sub>t</sub></strong>, approximate the safety of a
+      proposed policy, and search within a manageable family of policies.
+      One way to write that approximation is:
+    </p>
+    <Equation
+      expression={String.raw`z_t=f_{\eta}(h_t),\qquad \hat q_{\psi}(z_t,\pi)\approx P_{\hat T_{\psi},\hat Z_{\psi},\pi}\!\left(s_{t:t+H}\subseteq\mathcal{S}_{\mathrm{safe}}\mid z_t\right),\qquad \pi\in\Pi_{\omega}`}
+      label="A learned representation of history feeds a learned dynamics model that estimates the probability of a safe trajectory for policies in a restricted policy family."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The encoder
+      <strong>f<sub>η</sub></strong> compresses the observation-action
+      history <strong>h<sub>t</sub></strong> into
+      <strong>z<sub>t</sub></strong>. The learned transition and observation
+      models, <strong>T̂<sub>ψ</sub></strong> and
+      <strong>Ẑ<sub>ψ</sub></strong>, then estimate the chance that policy
+      <strong>π</strong> stays safe for <strong>H</strong> steps.
+      <strong>Π<sub>ω</sub></strong> is the policy family the planner can
+      actually search. The estimate is therefore not the exact viability
+      value from the earlier definition: it is an approximation, made using
+      a compressed history, learned dynamics, and a restricted search space.
+    </p>
+
+    <p>
+      Each of those shortcuts can matter most in the very places where the
+      agent has least experience. Compression can discard a detail that
+      distinguishes a harmless configuration from a dangerous one. A
+      policy search can miss a safe route that lies outside its chosen
+      family. And a world model can be smooth, persuasive, and wrong. The
+      practical question is not whether we can write down a viability
+      function, but whether its errors remain visible enough to keep it from
+      becoming a false assurance.
+    </p>
+
+    <h2>The safety boundary is learned, and it moves</h2>
+    <p>
+      The earlier controller used a margin between predicted safety and a
+      tolerated failure probability. In a real learner, both the prediction
+      and its uncertainty estimate come from models that are still changing.
+      It helps to name the boundary the optimizer is being asked to respect:
+    </p>
+    <Equation
+      expression={String.raw`g_{\psi}(z,\pi)=\bar q_{\psi}(z,\pi)-\kappa\sqrt{U_{\mathrm{ep},\psi}(z,\pi)}-(1-\delta)\geq 0`}
+      label="A candidate policy is accepted when its estimated mean safety probability, reduced by an epistemic uncertainty margin, exceeds the required threshold."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The boundary function
+      <strong>g<sub>ψ</sub></strong> is nonnegative when a policy clears the
+      safety threshold. <strong>q̄<sub>ψ</sub></strong> is the ensemble's
+      mean prediction, while <strong>U<sub>ep,ψ</sub></strong> measures how
+      much its members disagree. The factor <strong>κ</strong> determines
+      how much that disagreement lowers the estimate, and
+      <strong>δ</strong> sets the tolerated failure probability. This
+      uncertainty margin is useful only to the extent that the ensemble is
+      informative and its predictions are calibrated; it is not, by itself,
+      a certificate about the real system.
+    </p>
+
+    <p>
+      It is natural to reach for a constrained optimizer here. A Lagrangian
+      method gives violations a price that grows when the constraint is not
+      being met. If <strong>ω</strong> denotes the policy parameters and
+      the safety model is held fixed during an inner optimization step, a
+      simple version is:
+    </p>
+    <Equation
+      expression={String.raw`\mathcal{L}(\omega,\lambda;\psi,z_t)=J_r(\omega)+\lambda\,g_{\psi}(z_t,\pi_{\omega}),\qquad \lambda_{k+1}=\left[\lambda_k-\alpha_{\lambda}g_{\psi_k}(z_t,\pi_{\omega_k})\right]_+`}
+      label="A Lagrangian rewards task return while pricing violations of the learned safety constraint, with a projected dual update for the multiplier."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The policy seeks task return
+      <strong>J<sub>r</sub></strong> while the multiplier
+      <strong>λ</strong> gives weight to the safety boundary
+      <strong>g<sub>ψ</sub></strong>. If the boundary is violated,
+      <strong>g<sub>ψ</sub></strong> is negative, so the next multiplier
+      grows; the brackets project it back to nonnegative values.
+      <strong>α<sub>λ</sub></strong> is the update step size. Freezing
+      <strong>ψ</strong> during the inner step makes the boundary less
+      slippery for that step, but it does not make the learned estimate
+      stationary over training or make it equal to safety in the real
+      environment.
+    </p>
+
+    <p>
+      This is a sensible starting point, not a clean escape from the
+      difficulty. In ordinary constrained control, the cost may be fixed
+      while the policy changes. Here the boundary itself is estimated by a
+      learned model; update the model and the boundary can move beneath the
+      policy. Approximate optimization can then chase yesterday’s safe
+      region, while a large multiplier can make the agent overly cautious
+      and a small one can leave violations uncorrected. A Lagrangian
+      penalty can help balance the objectives, but it cannot turn an
+      uncertain prediction into a hard guarantee.
+    </p>
+
+    <p>
+      That distinction suggests a more careful experiment: keep the safety
+      model fixed while optimizing a policy, measure its constraint on fresh
+      rollouts, then update the model and repeat. The fresh rollouts matter.
+      If we choose a policy and judge it on the same small batch of
+      simulations, the search can select a lucky estimate rather than a
+      genuinely safe behavior. Even with this discipline, the claim would
+      remain conditional: the policy satisfied the estimated constraint
+      under the tested model and distribution, not every possible future.
+    </p>
+
+    <h2>One confidence signal can share one blind spot</h2>
+    <p>
+      There is another quiet risk. An ensemble is useful because different
+      models may disagree, but agreement is not the same as knowledge. If
+      every model learned from similar examples, shares the same
+      architecture, and compresses away the same warning sign, they may
+      confidently make the same mistake. Low disagreement can mean
+      confidence; it can also mean that the models have inherited the same
+      blind spot.
+    </p>
+
+    <p>
+      I would not make attention the villain in this story. A transformer
+      can be miscalibrated, but so can another function approximator. The
+      deeper problem is asking one learned score to tell us both how safe a
+      future is and how much we should trust the estimate. It may be more
+      useful to keep several kinds of warning visible:
+    </p>
+    <Equation
+      expression={String.raw`\mathbf{u}_t=\left(e_t,d_t,n_t\right),\qquad e_t=\left\|o_t-\hat o_t\right\|_{\Sigma^{-1}}^2,\qquad d_t=\sqrt{\operatorname{Var}_{\theta}\!\left[q_{\theta}(b_t,\pi)\right]},\qquad n_t=\min_{z_i\in\mathcal{D}}\left\|z_t-z_i\right\|_2`}
+      label="A candidate uncertainty vector keeps prediction error, model disagreement, and distance from previously observed representations as separate signals."
+    />
+    <p class="math-translation">
+      <strong>Translating the math:</strong> The vector
+      <strong>u<sub>t</sub></strong> keeps three clues distinct.
+      <strong>e<sub>t</sub></strong> is the observation prediction error,
+      scaled by the model's error covariance <strong>Σ</strong>;
+      <strong>d<sub>t</sub></strong> is disagreement among models about
+      safety; and <strong>n<sub>t</sub></strong> is the distance from the
+      current latent state to the nearest state in the training data
+      <strong>𝒟</strong>. A surprising observation, model disagreement, and
+      an unfamiliar representation are related but not interchangeable.
+      Each can be misleading on its own, so these quantities need
+      calibration and separate evaluation before they should influence a
+      safety decision.
+    </p>
+
+    <p>
+      This leaves room for a different architectural question. Predictive
+      coding makes the mismatch between expectation and observation an
+      explicit signal. Pattern separation offers one way to keep similar
+      but consequentially different situations apart. Neuromodulatory
+      signals suggest a distinction between uncertainty expected in a
+      familiar, noisy setting and surprise when something unforeseen
+      happens. Slow traces of familiarity, or local measures of prediction
+      quality, might add further checks. These are design inspirations, not
+      a ready-made biological solution: a brain mechanism does not become
+      reliable in an artificial system simply because we give it a neural
+      name.
+    </p>
+
+    <p>
+      Still, the broader lesson seems worth keeping. A cautious system may
+      need signals that differ in where they come from and how quickly they
+      change, rather than a single confidence number that can fail in one
+      shared way. One signal might say, “This outcome is naturally
+      variable.” Another might say, “I have not seen a situation like this.”
+      A third might say, “The models disagree about what happens next.”
+      The agent should not treat those statements as equivalent, and we
+      should not assume that combining them automatically makes them
+      trustworthy.
+    </p>
+
+    <p>
+      This changes the practical shape of the proposal. ABL is not only a
+      question about adding a viability loss to training. It is also a
+      question about what evidence an agent uses to trust its own
+      predictions, how that evidence is represented, and whether its
+      independent checks remain independent when the world shifts. The
+      biological analogies may help us imagine such checks; only controlled
+      comparisons can tell us whether they help.
+    </p>
+
     <h2>What would convince me this is different?</h2>
     <p>
       It may turn out that ABL is constrained model-based planning with
