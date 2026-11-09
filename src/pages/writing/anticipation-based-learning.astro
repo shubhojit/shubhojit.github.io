@@ -502,6 +502,56 @@ function inlineMath(expression: string) {
       again.
     </p>
 
+    <figure
+      class="abl-figure abl-threshold-figure"
+      tabindex="0"
+      aria-label="Scrollable conceptual plot of safety-adjusted plan selection"
+    >
+      <svg
+        viewBox="0 0 720 340"
+        role="img"
+        aria-labelledby="abl-threshold-title abl-threshold-description"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <title id="abl-threshold-title">Choosing among candidate plans</title>
+        <desc id="abl-threshold-description">
+          A conceptual scatter plot of candidate plans by task return and
+          uncertainty-adjusted safety. A high-return plan below the safety
+          threshold is rejected. Of the plans above the threshold, the one
+          with the highest return is selected.
+        </desc>
+        <rect x="106" y="35" width="544" height="220" fill="#f0eee9" />
+        <line x1="106" y1="255" x2="650" y2="255" stroke="#6e6a64" stroke-width="1.5" />
+        <line x1="106" y1="35" x2="106" y2="255" stroke="#6e6a64" stroke-width="1.5" />
+        <line x1="106" y1="162" x2="650" y2="162" stroke="#8a3d2f" stroke-width="2" stroke-dasharray="7 6" />
+        <text x="116" y="153" fill="#8a3d2f" font-size="14" font-family="DM Sans, sans-serif">required safety threshold: 1 − δ</text>
+        <text x="118" y="58" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">passes safety threshold</text>
+        <text x="118" y="184" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">below threshold</text>
+
+        <circle cx="548" cy="199" r="9" fill="#fbfaf7" stroke="#8a3d2f" stroke-width="3" />
+        <text x="562" y="204" fill="#242424" font-size="15" font-family="DM Sans, sans-serif">Plan A · reject</text>
+        <text x="537" y="220" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">high return, insufficient safety</text>
+
+        <circle cx="306" cy="104" r="8" fill="#fbfaf7" stroke="#6e6a64" stroke-width="2.5" />
+        <text x="270" y="90" fill="#242424" font-size="15" font-family="DM Sans, sans-serif">Plan B</text>
+        <text x="256" y="128" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">safe, lower return</text>
+
+        <circle cx="445" cy="78" r="10" fill="#8a3d2f" stroke="#8a3d2f" stroke-width="2" />
+        <circle cx="445" cy="78" r="15" fill="none" stroke="#8a3d2f" stroke-width="1" />
+        <text x="464" y="76" fill="#242424" font-size="15" font-family="DM Sans, sans-serif">Plan C · select</text>
+        <text x="464" y="96" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">best return among passing plans</text>
+
+        <text x="378" y="310" text-anchor="middle" fill="#242424" font-size="15" font-family="DM Sans, sans-serif">Expected task return</text>
+        <text transform="translate(30 145) rotate(-90)" text-anchor="middle" fill="#242424" font-size="15" font-family="DM Sans, sans-serif">Uncertainty-adjusted safety estimate</text>
+        <text x="380" y="332" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">Conceptual illustration; points are not experimental results.</text>
+      </svg>
+      <figcaption>
+        A plan can promise more reward and still fail the safety test. The
+        controller first rules out plans below the uncertainty-adjusted
+        threshold, then chooses the best remaining option.
+      </figcaption>
+    </figure>
+
     <p>
       We also need to decide what happens if no sequence satisfies the
       constraint. A controller cannot quietly pretend it found a safe option.
@@ -510,6 +560,97 @@ function inlineMath(expression: string) {
       right response is part of the system design, not a footnote to the
       optimizer.
     </p>
+
+    <figure
+      class="abl-figure abl-flow-figure"
+      tabindex="0"
+      aria-label="Scrollable diagram of the anticipation-based planning loop"
+    >
+      <svg
+        viewBox="0 0 800 430"
+        role="img"
+        aria-labelledby="abl-flow-title abl-flow-description"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <title id="abl-flow-title">From partial observation to replanning</title>
+        <desc id="abl-flow-description">
+          The agent forms a belief from observations, considers candidate
+          plans, predicts multiple possible futures for each, and checks
+          viability. Plans may pass, fail, or require more information. The
+          selected plan executes only its first action before the agent
+          observes and replans.
+        </desc>
+        <defs>
+          <marker id="abl-flow-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 Z" fill="#9b9993" />
+          </marker>
+        </defs>
+
+        <text x="24" y="30" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">INFORMATION</text>
+        <text x="207" y="30" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">CANDIDATE PLANS</text>
+        <text x="390" y="30" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">PREDICTED FUTURES</text>
+        <text x="603" y="30" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">VIABILITY CHECK</text>
+
+        <rect x="20" y="168" width="135" height="88" rx="8" fill="#fbfaf7" stroke="#dedbd4" stroke-width="2" />
+        <text x="87.5" y="202" text-anchor="middle" fill="#242424" font-size="16" font-family="DM Sans, sans-serif" font-weight="600">Current belief</text>
+        <text x="87.5" y="226" text-anchor="middle" fill="#6e6a64" font-size="13" font-family="DM Sans, sans-serif">what may be true now</text>
+
+        <rect x="205" y="75" width="140" height="66" rx="8" fill="#fbfaf7" stroke="#dedbd4" stroke-width="2" />
+        <text x="275" y="103" text-anchor="middle" fill="#242424" font-size="15" font-family="DM Sans, sans-serif" font-weight="600">Plan A</text>
+        <text x="275" y="124" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">candidate actions</text>
+        <rect x="205" y="175" width="140" height="66" rx="8" fill="#fbfaf7" stroke="#dedbd4" stroke-width="2" />
+        <text x="275" y="203" text-anchor="middle" fill="#242424" font-size="15" font-family="DM Sans, sans-serif" font-weight="600">Plan B</text>
+        <text x="275" y="224" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">candidate actions</text>
+        <rect x="205" y="275" width="140" height="66" rx="8" fill="#fbfaf7" stroke="#dedbd4" stroke-width="2" />
+        <text x="275" y="303" text-anchor="middle" fill="#242424" font-size="15" font-family="DM Sans, sans-serif" font-weight="600">Plan C</text>
+        <text x="275" y="324" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">candidate actions</text>
+
+        <path d="M155 212 H178 M178 108 V308" fill="none" stroke="#9b9993" stroke-width="1.8" />
+        <path d="M178 108 H205" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <path d="M178 208 H205" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <path d="M178 308 H205" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+
+        <path d="M345 108 H378" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <path d="M345 208 H378" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <path d="M345 308 H378" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+
+        <rect x="385" y="75" width="184" height="66" rx="8" fill="#fbfaf7" stroke="#dedbd4" stroke-width="2" />
+        <text x="477" y="102" text-anchor="middle" fill="#242424" font-size="14" font-family="DM Sans, sans-serif">mostly safe futures</text>
+        <text x="477" y="123" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">little model disagreement</text>
+        <rect x="385" y="175" width="184" height="66" rx="8" fill="#fbfaf7" stroke="#8a3d2f" stroke-width="2" />
+        <text x="477" y="202" text-anchor="middle" fill="#242424" font-size="14" font-family="DM Sans, sans-serif">some unsafe futures</text>
+        <text x="477" y="223" text-anchor="middle" fill="#8a3d2f" font-size="12" font-family="DM Sans, sans-serif">safety estimate falls</text>
+        <rect x="385" y="275" width="184" height="66" rx="8" fill="#fbfaf7" stroke="#9b9993" stroke-width="2" stroke-dasharray="6 4" />
+        <text x="477" y="302" text-anchor="middle" fill="#242424" font-size="14" font-family="DM Sans, sans-serif">models disagree</text>
+        <text x="477" y="323" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">prediction deserves less trust</text>
+
+        <path d="M569 108 H590" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <path d="M569 208 H590" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <path d="M569 308 H590" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+
+        <rect x="598" y="75" width="142" height="66" rx="8" fill="#fbfaf7" stroke="#dedbd4" stroke-width="2" />
+        <text x="669" y="103" text-anchor="middle" fill="#242424" font-size="14" font-family="DM Sans, sans-serif" font-weight="600">passes margin</text>
+        <text x="669" y="124" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">eligible for selection</text>
+        <rect x="598" y="175" width="142" height="66" rx="8" fill="#fbfaf7" stroke="#8a3d2f" stroke-width="2" />
+        <text x="669" y="203" text-anchor="middle" fill="#8a3d2f" font-size="14" font-family="DM Sans, sans-serif" font-weight="600">fails threshold</text>
+        <text x="669" y="224" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">do not execute</text>
+        <rect x="598" y="275" width="142" height="66" rx="8" fill="#fbfaf7" stroke="#9b9993" stroke-width="2" stroke-dasharray="6 4" />
+        <text x="669" y="302" text-anchor="middle" fill="#242424" font-size="14" font-family="DM Sans, sans-serif" font-weight="600">pause or ask</text>
+        <text x="669" y="323" text-anchor="middle" fill="#6e6a64" font-size="12" font-family="DM Sans, sans-serif">gather more evidence</text>
+
+        <path d="M740 108 H778 V386 H570" fill="none" stroke="#9b9993" stroke-width="1.8" marker-end="url(#abl-flow-arrow)" />
+        <rect x="235" y="365" width="335" height="42" rx="8" fill="#f0eee9" stroke="#dedbd4" stroke-width="1.5" />
+        <text x="402.5" y="391" text-anchor="middle" fill="#242424" font-size="14" font-family="DM Sans, sans-serif">execute first action · observe · update belief · replan</text>
+        <path d="M235 386 H12 V148 H87.5 V168" fill="none" stroke="#9b9993" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#abl-flow-arrow)" />
+      </svg>
+      <figcaption>
+        The controller does not commit to a whole imagined future. It checks
+        candidate plans, acts once, then uses the next observation to update
+        its belief and plan again. These branches are schematic; in a real
+        system, the model’s estimates would need calibration against observed
+        outcomes.
+      </figcaption>
+    </figure>
 
     <h2>How would the agent learn these representations?</h2>
     <p>
@@ -710,7 +851,8 @@ function inlineMath(expression: string) {
       The earlier controller used a margin between predicted safety and a
       tolerated failure probability. In a real learner, both the prediction
       and its uncertainty estimate come from models that are still changing.
-      It helps to name the boundary the optimizer is being asked to respect:
+      I think it helps to name the boundary the optimizer is being asked to
+      respect:
     </p>
     <Equation
       expression={String.raw`g_{\psi}(z,\pi)=\bar q_{\psi}(z,\pi)-\kappa\sqrt{U_{\mathrm{ep},\psi}(z,\pi)}-(1-\delta)\geq 0`}
@@ -730,11 +872,11 @@ function inlineMath(expression: string) {
     </p>
 
     <p>
-      It is natural to reach for a constrained optimizer here. A Lagrangian
-      method gives violations a price that grows when the constraint is not
-      being met. If <strong>ω</strong> denotes the policy parameters and
-      the safety model is held fixed during an inner optimization step, a
-      simple version is:
+      My first instinct here is to reach for a constrained optimizer. A
+      Lagrangian method gives violations a price that grows when the
+      constraint is not being met. If <strong>ω</strong> denotes the policy
+      parameters and the safety model is held fixed during an inner
+      optimization step, a simple version is:
     </p>
     <Equation
       expression={String.raw`\mathcal{L}(\omega,\lambda;\psi,z_t)=J_r(\omega)+\lambda\,g_{\psi}(z_t,\pi_{\omega}),\qquad \lambda_{k+1}=\left[\lambda_k-\alpha_{\lambda}g_{\psi_k}(z_t,\pi_{\omega_k})\right]_+`}
@@ -755,8 +897,8 @@ function inlineMath(expression: string) {
     </p>
 
     <p>
-      This is a sensible starting point, not a clean escape from the
-      difficulty. In ordinary constrained control, the cost may be fixed
+      I think this is a sensible starting point, but not a clean escape from
+      the difficulty. In ordinary constrained control, the cost may be fixed
       while the policy changes. Here the boundary itself is estimated by a
       learned model; update the model and the boundary can move beneath the
       policy. Approximate optimization can then chase yesterday’s safe
@@ -767,14 +909,15 @@ function inlineMath(expression: string) {
     </p>
 
     <p>
-      That distinction suggests a more careful experiment: keep the safety
-      model fixed while optimizing a policy, measure its constraint on fresh
-      rollouts, then update the model and repeat. The fresh rollouts matter.
-      If we choose a policy and judge it on the same small batch of
-      simulations, the search can select a lucky estimate rather than a
-      genuinely safe behavior. Even with this discipline, the claim would
-      remain conditional: the policy satisfied the estimated constraint
-      under the tested model and distribution, not every possible future.
+      Because of that difference, I think we have to be more careful with
+      how we set up the test. We could keep the safety model fixed while
+      optimizing a policy, measure its constraint on fresh rollouts, then
+      update the model and repeat. Those fresh rollouts matter. If we choose
+      a policy and judge it on the same small batch of simulations, the
+      search can select a lucky estimate rather than a genuinely safe
+      behavior. Even with this discipline, I suppose the claim would remain
+      conditional: the policy satisfied the estimated constraint under the
+      tested model and distribution, not every possible future.
     </p>
 
     <h2>One confidence signal can share one blind spot</h2>
@@ -815,17 +958,17 @@ function inlineMath(expression: string) {
     </p>
 
     <p>
-      This leaves room for a different architectural question. Predictive
-      coding makes the mismatch between expectation and observation an
-      explicit signal. Pattern separation offers one way to keep similar
-      but consequentially different situations apart. Neuromodulatory
-      signals suggest a distinction between uncertainty expected in a
-      familiar, noisy setting and surprise when something unforeseen
-      happens. Slow traces of familiarity, or local measures of prediction
-      quality, might add further checks. These are design inspirations, not
-      a ready-made biological solution: a brain mechanism does not become
-      reliable in an artificial system simply because we give it a neural
-      name.
+      I suppose this leaves room for a different architectural question.
+      Predictive coding makes the mismatch between expectation and
+      observation an explicit signal. Pattern separation offers one way to
+      keep similar but consequentially different situations apart.
+      Neuromodulatory signals suggest a distinction between uncertainty
+      expected in a familiar, noisy setting and surprise when something
+      unforeseen happens. Slow traces of familiarity, or local measures of
+      prediction quality, might add further checks. These are design
+      inspirations, not a ready-made biological solution: a brain mechanism
+      does not become reliable in an artificial system simply because we
+      give it a neural name.
     </p>
 
     <p>
@@ -841,9 +984,9 @@ function inlineMath(expression: string) {
     </p>
 
     <p>
-      This changes the practical shape of the proposal. ABL is not only a
-      question about adding a viability loss to training. It is also a
-      question about what evidence an agent uses to trust its own
+      To me, this changes the practical shape of the proposal. ABL is not
+      only a question about adding a viability loss to training. It is also
+      a question about what evidence an agent uses to trust its own
       predictions, how that evidence is represented, and whether its
       independent checks remain independent when the world shifts. The
       biological analogies may help us imagine such checks; only controlled
@@ -993,3 +1136,36 @@ function inlineMath(expression: string) {
 }`}</code></pre>
   </article>
 </BaseLayout>
+
+<style>
+  .abl-figure {
+    margin: 34px 0;
+    padding: 18px 0;
+    overflow-x: auto;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    overscroll-behavior-x: contain;
+  }
+
+  .abl-figure svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .abl-figure figcaption {
+    margin-top: 14px;
+    color: var(--muted);
+    font: 14px/1.6 "DM Sans", sans-serif;
+  }
+
+  @media (max-width: 650px) {
+    .abl-threshold-figure svg {
+      min-width: 660px;
+    }
+
+    .abl-flow-figure svg {
+      min-width: 760px;
+    }
+  }
+</style>
